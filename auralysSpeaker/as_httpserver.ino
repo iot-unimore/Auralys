@@ -104,6 +104,8 @@ void httpServerLoop()
                                 LOG_MSG("POST request for set-position: ");
                                 displayCtrlMsgTemp("SET_POSITION", 5);
 
+                                setMksMotorPosition3(1, 100, 20, absoluteAxis);
+
                                 String post_param = "";
                                 char p;
 

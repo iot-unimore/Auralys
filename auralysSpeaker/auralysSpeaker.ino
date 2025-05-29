@@ -344,10 +344,8 @@ uint8_t txBuffer[64]; // send data array
 uint8_t rxBuffer[64]; // Receive data array
 uint8_t rxCnt = 0; // Receive data count
 
-#define AXIS_INIT 4000
-
+#define AXIS_INIT 163840
 int32_t absoluteAxis = AXIS_INIT; // 163840;           //absolute coordinates
-
 uint8_t mksMotorSlaveAddr = 0x01;
 
 /*

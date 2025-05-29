@@ -12,106 +12,6 @@ void mksLoop()
 
 }
 
-int8_t getMksMotorStatus(uint8_t slaveAddr)
-{
-    int8_t rv = -1;
-
-    int i;
-    uint16_t checkSum = 0;
-    uint8_t ackStatus;
-
-    /* manual 6.2.1: query motor */
-
-    txBuffer[0] = 0xFA; // frame header
-    txBuffer[1] = slaveAddr; // slave address
-    txBuffer[2] = 0xF1; // function code
-    txBuffer[3] = mksGetCheckSum(txBuffer, 3); // Calculate checksum
-
-    // Send command
-    Serial1.write(txBuffer, 4);
-
-    // Wait to start answering
-    ackStatus = mksWaitingForACK(3000);
-
-    if( ackStatus == 1 )
-    {
-        // Wait to complete the response
-        ackStatus = mksWaitingForACK(0);
-        if( ackStatus == 2 )
-        {
-            // Response completed
-            rv = rxBuffer[3];
-            LOG_PRINTF("Motor Status: %d", rv);
-            if( rv == 0 )
-            {
-                rv = -1; // failure
-            }
-        }
-        else
-        {
-            // Incomplete response
-            ledRgbBlinkN(ledRgbColorRed, 0.5 * ONESEC_MSECS, 3);
-        }
-    }
-    else
-    {
-        // Command failed
-        ledRgbBlinkN(ledRgbColorViolet, 0.5 * ONESEC_MSECS, 3);
-    }
-
-    return rv;
-}
-
-uint64_t getMksEncoderValueCarry(uint8_t slaveAddr)
-{
-    // int i;
-    // uint16_t checkSum = 0;
-
-    // txBuffer[0] = 0xFA; // frame header
-    // txBuffer[1] = slaveAddr; // slave address
-    // txBuffer[2] = 0xF5; // function code
-    // txBuffer[3] = (speed >> 8) & 0x00FF; // 8 bit higher speed
-    // txBuffer[4] = speed & 0x00FF; // 8 bits lower
-    // txBuffer[5] = acc; // acceleration
-    // txBuffer[6] = (absAxis >> 24) & 0xFF; // Absolute coordinates bit31 - bit24
-    // txBuffer[7] = (absAxis >> 16) & 0xFF; // Absolute coordinates bit23 - bit16
-    // txBuffer[8] = (absAxis >> 8) & 0xFF; // Absolute coordinates bit15 - bit8
-    // txBuffer[9] = (absAxis >> 0) & 0xFF; // Absolute coordinates bit7 - bit0
-    // txBuffer[10] = mksGetCheckSum(txBuffer, 10); // Calculate checksum
-
-    // Serial1.write(txBuffer, 11);
-
-    return 0;
-
-}
-
-/*
-   Function: Serial port sends position mode 3 running command
-   Input: slaveAddr slave address
-       speed running speed
-       acc acceleration
-       absAxis absolute coordinates
- */
-void mksPositionMode3Run(uint8_t slaveAddr, uint16_t speed, uint8_t acc, int32_t absAxis)
-{
-    int i;
-    uint16_t checkSum = 0;
-
-    txBuffer[0] = 0xFA; // frame header
-    txBuffer[1] = slaveAddr; // slave address
-    txBuffer[2] = 0xF5; // function code
-    txBuffer[3] = (speed >> 8) & 0x00FF; // 8 bit higher speed
-    txBuffer[4] = speed & 0x00FF; // 8 bits lower
-    txBuffer[5] = acc; // acceleration
-    txBuffer[6] = (absAxis >> 24) & 0xFF; // Absolute coordinates bit31 - bit24
-    txBuffer[7] = (absAxis >> 16) & 0xFF; // Absolute coordinates bit23 - bit16
-    txBuffer[8] = (absAxis >> 8) & 0xFF; // Absolute coordinates bit15 - bit8
-    txBuffer[9] = (absAxis >> 0) & 0xFF; // Absolute coordinates bit7 - bit0
-    txBuffer[10] = mksGetCheckSum(txBuffer, 10); // Calculate checksum
-
-    Serial1.write(txBuffer, 11);
-}
-
 /*
    Function: Calculate the checksum of a set of data
    Input: buffer data to be verified
@@ -140,7 +40,7 @@ uint8_t mksGetCheckSum(uint8_t* buffer, uint8_t size)
    Position mode 2 control failure 0
    timeout no reply 0
  */
-uint8_t mksWaitingForACK(uint32_t delayTime)
+uint8_t mksWaitingForACK(uint32_t len, uint32_t delayTime)
 {
     uint8_t retVal; // return value
     unsigned long sTime; // timing start time
@@ -164,9 +64,9 @@ uint8_t mksWaitingForACK(uint32_t delayTime)
             }
         }
 
-        if( rxCnt == 5 ) // Receive complete
+        if( rxCnt == len ) // Receive complete
         {
-            if( rxBuffer[4] == mksGetCheckSum(rxBuffer, 4))
+            if( rxBuffer[len - 1] == mksGetCheckSum(rxBuffer, len - 1))
             {
                 retVal = rxBuffer[3]; // checksum correct
                 break; // exit while(1)
@@ -185,4 +85,150 @@ uint8_t mksWaitingForACK(uint32_t delayTime)
         }
     }
     return(retVal);
+}
+
+int8_t getMksMotorStatus(uint8_t slaveAddr)
+{
+    int8_t rv = -1;
+
+    int i;
+    uint16_t checkSum = 0;
+    uint8_t ackStatus;
+
+    /* manual 6.2.1: query motor */
+    txBuffer[0] = 0xFA; // frame header
+    txBuffer[1] = slaveAddr; // slave address
+    txBuffer[2] = 0xF1; // function code
+    txBuffer[3] = mksGetCheckSum(txBuffer, 3); // Calculate checksum
+
+    // Send command
+    Serial1.write(txBuffer, 4);
+
+    // Wait to start answering
+    ackStatus = mksWaitingForACK(5, 3000);
+    if( ackStatus > 0 )
+    {
+
+        // Response completed
+        rv = rxBuffer[3];
+        if( rv == 0 )
+        {
+            rv = -1;   // failure
+        }
+    }
+    else
+    {
+        // Incomplete response
+        ledRgbBlinkN(ledRgbColorRed, 0.5 * ONESEC_MSECS, 3);
+    }
+
+    return rv;
+}
+
+uint64_t getMksEncoderValueCarry(uint8_t slaveAddr)
+{
+    // int i;
+    // uint16_t checkSum = 0;
+
+    // txBuffer[0] = 0xFA; // frame header
+    // txBuffer[1] = slaveAddr; // slave address
+    // txBuffer[2] = 0xF5; // function code
+    // txBuffer[3] = (speed >> 8) & 0x00FF; // 8 bit higher speed
+    // txBuffer[4] = speed & 0x00FF; // 8 bits lower
+    // txBuffer[5] = acc; // acceleration
+    // txBuffer[6] = (absAxis >> 24) & 0xFF; // Absolute coordinates bit31 - bit24
+    // txBuffer[7] = (absAxis >> 16) & 0xFF; // Absolute coordinates bit23 - bit16
+    // txBuffer[8] = (absAxis >> 8) & 0xFF; // Absolute coordinates bit15 - bit8
+    // txBuffer[9] = (absAxis >> 0) & 0xFF; // Absolute coordinates bit7 - bit0
+    // txBuffer[10] = mksGetCheckSum(txBuffer, 10); // Calculate checksum
+
+    // Serial1.write(txBuffer, 11);
+
+    return 0;
+
+}
+
+int8_t setMksMotorPosition3(uint8_t slaveAddr, uint16_t speed, uint8_t acc, int32_t absAxis)
+{
+    int i;
+    uint16_t checkSum = 0;
+    uint8_t ackStatus;
+
+    txBuffer[0] = 0xFA; // frame header
+    txBuffer[1] = slaveAddr; // slave address
+    txBuffer[2] = 0xF5; // function code
+    txBuffer[3] = (speed >> 8) & 0x00FF; // 8 bit higher speed
+    txBuffer[4] = speed & 0x00FF; // 8 bits lower
+    txBuffer[5] = acc; // acceleration
+    txBuffer[6] = (absAxis >> 24) & 0xFF; // Absolute coordinates bit31 - bit24
+    txBuffer[7] = (absAxis >> 16) & 0xFF; // Absolute coordinates bit23 - bit16
+    txBuffer[8] = (absAxis >> 8) & 0xFF; // Absolute coordinates bit15 - bit8
+    txBuffer[9] = (absAxis >> 0) & 0xFF; // Absolute coordinates bit7 - bit0
+    txBuffer[10] = mksGetCheckSum(txBuffer, 10); // Calculate checksum
+
+    Serial1.write(txBuffer, 11);
+
+    // Wait for the position control to start answering
+    ackStatus = mksWaitingForACK(5, 3000);
+
+    if( ackStatus == 1 )
+    {
+        // Position control starts
+
+        // Wait for the position control to complete the response
+        ackStatus = mksWaitingForACK(5, 0);
+        if( ackStatus == 2 )
+        {
+            // Receipt of position control complete response
+            if( absoluteAxis == 0 )
+            {
+                absoluteAxis = AXIS_INIT; // 81920;//163840;    //Set absolute coordinates
+            }
+            else
+            {
+                absoluteAxis = 0;
+            }
+
+        }
+        else
+        {
+            // Location complete reply not received
+            ledRgbBlinkN(ledRgbColorRed, 0.5 * ONESEC_MSECS, 3);
+        }
+    }
+    else
+    {
+        // Position control failed
+        ledRgbBlinkN(ledRgbColorViolet, 0.5 * ONESEC_MSECS, 3);
+    }
+
+    return ackStatus;
+}
+
+/*
+   Function: Serial port sends position mode 3 running command
+   Input: slaveAddr slave address
+       speed running speed
+       acc acceleration
+       absAxis absolute coordinates
+ */
+void mksPositionMode3Run(uint8_t slaveAddr, uint16_t speed, uint8_t acc, int32_t absAxis)
+{
+    int i;
+    uint16_t checkSum = 0;
+
+    txBuffer[0] = 0xFA; // frame header
+    txBuffer[1] = slaveAddr; // slave address
+    txBuffer[2] = 0xF5; // function code
+    txBuffer[3] = (speed >> 8) & 0x00FF; // 8 bit higher speed
+    txBuffer[4] = speed & 0x00FF; // 8 bits lower
+    txBuffer[5] = acc; // acceleration
+    txBuffer[6] = (absAxis >> 24) & 0xFF; // Absolute coordinates bit31 - bit24
+    txBuffer[7] = (absAxis >> 16) & 0xFF; // Absolute coordinates bit23 - bit16
+    txBuffer[8] = (absAxis >> 8) & 0xFF; // Absolute coordinates bit15 - bit8
+    txBuffer[9] = (absAxis >> 0) & 0xFF; // Absolute coordinates bit7 - bit0
+    txBuffer[10] = mksGetCheckSum(txBuffer, 10); // Calculate checksum
+
+    Serial1.write(txBuffer, 11);
+
 }
