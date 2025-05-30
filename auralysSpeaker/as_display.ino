@@ -64,8 +64,17 @@ void displayLoop()
         display.print(sbuf);
     }
 
+    {
+        // #2: ACCELEROMETER
+        display.setCursor(0, LINE_ORIGIN + LINE_SIZE);
+        display.setTextSize(1);
+        display.setTextColor(SH110X_WHITE);
+        sprintf(sbuf, "XYZ: %1.2f %1.2f %1.2f", acc_x, acc_y, acc_z);
+        display.print(sbuf);
+    }
+
     uint8_t l = 0;
-    for(int i = 24; i < 45; i += 10)
+    for(int i = 34; i < 45; i += 10)
     {
         display.setCursor(0, i);
         display.setTextSize(1);

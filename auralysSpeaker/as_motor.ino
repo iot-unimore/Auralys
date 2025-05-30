@@ -113,7 +113,7 @@ int8_t getMksMotorStatus(uint8_t slaveAddr)
         rv = rxBuffer[3];
         if( rv == 0 )
         {
-            rv = -1;   // failure
+            rv = -1; // failure
         }
     }
     else

@@ -41,7 +41,7 @@
 
 #include <ArduinoJson.h>
 
-
+#include "stdint.h"
 #include "esp_adc/adc_continuous.h"
 #include "esp32/ulp.h"
 #include "soc/rtc_cntl_reg.h"
@@ -198,6 +198,8 @@ Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, 
 #define BSP_BTN0_09                                                             (9)
 #define BSP_BTN0_12                                                            (12)
 
+#define BSP_I2C_PROBE_RETRY_MAX                                                 (7)
+
 /* CPU speed control */
 uint32_t bspCpuMhzCurrent = BSP_CPU_MHZ_DEFAULT;
 uint32_t bspCpuMhzPrevious = BSP_CPU_MHZ_DEFAULT;
@@ -348,6 +350,32 @@ uint8_t rxCnt = 0; // Receive data count
 int32_t absoluteAxis = AXIS_INIT; // 163840;           //absolute coordinates
 uint8_t mksMotorSlaveAddr = 0x01;
 
+
+/* ============================================================================= */
+/* MOTION (ACCELEROMETER) GLOBALS&DEFINES SECTION                                */
+/* ============================================================================= */
+#include <LIS3DSH.h>
+
+#define LIS3DSH_ADDR (0x1D) /// Default address is 0x19, ALT is 0x18
+
+#define  MOTION_G_FORCE                                         ((float) (9.8066))
+#define  MOTION_X_AXIS                                                         (0)
+#define  MOTION_Y_AXIS                                                         (1)
+#define  MOTION_Z_AXIS                                                         (2)
+#define  MOTION_NO_AXIS                                                        (3)
+#define  MOTION_RETRY_CNT_1S                                                (1000)
+
+#define MOTION_SENSITIVITY_2G (0.060f) // mg/LSB
+#define MG_TO_MS2 (0.00980665f)
+
+LIS3DSH sensMotion;
+
+volatile float acc_x, acc_y, acc_z;
+
+bool sensMotionEnabled = false;
+
+
+
 /*
  *
  * MAIN
@@ -443,6 +471,11 @@ void setup()
     displayCtrlMsg("Run WebServer..");
     httpServerSetup();
 
+    /* motion sensor */
+    motionSetup();
+
+    // bspI2CScan();
+
     /*
        spawn display refresh on a separate core
      */
@@ -465,6 +498,7 @@ void displayRefresh(void* param)
     /* needs to be encapsulated in a while(1) loop */
     while( 1 )
     {
+        motionLoop();
         displayLoop();
         delay(300);
 // #ifdef DEBUG
