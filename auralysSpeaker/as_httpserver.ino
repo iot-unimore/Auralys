@@ -211,7 +211,6 @@ void httpServerLoop()
                             client.println();
                             client.println();
 
-                            client.flush();
                             client.clear();
 
                             // clear web request
