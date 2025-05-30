@@ -256,7 +256,7 @@ bool volatile wifi_connected = false;
 
 /* HTTP data buffer */
 const uint32_t wifiConnectTimeoutMs = 7000;
-const long httpTimeoutTime2S = 2000;
+const long httpTimeoutTime2S = 5000;
 unsigned long httpCurrentTime = millis();
 unsigned long httpPreviousTime = 0;
 
@@ -344,7 +344,7 @@ uint8_t txBuffer[64]; // send data array
 uint8_t rxBuffer[64]; // Receive data array
 uint8_t rxCnt = 0; // Receive data count
 
-#define AXIS_INIT 163840
+#define AXIS_INIT (163840 * 2)
 int32_t absoluteAxis = AXIS_INIT; // 163840;           //absolute coordinates
 uint8_t mksMotorSlaveAddr = 0x01;
 

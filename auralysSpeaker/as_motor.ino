@@ -180,14 +180,16 @@ int8_t setMksMotorPosition3(uint8_t slaveAddr, uint16_t speed, uint8_t acc, int3
         if( ackStatus == 2 )
         {
             // Receipt of position control complete response
-            if( absoluteAxis == 0 )
-            {
-                absoluteAxis = AXIS_INIT; // 81920;//163840;    //Set absolute coordinates
-            }
-            else
-            {
-                absoluteAxis = 0;
-            }
+            // if( absoluteAxis == 0 )
+            // {
+            // absoluteAxis = AXIS_INIT; // 81920;//163840;    //Set absolute coordinates
+            // }
+            // else
+            // {
+            // absoluteAxis = 0;
+            // }
+
+            absoluteAxis = -1 * absoluteAxis;
 
         }
         else

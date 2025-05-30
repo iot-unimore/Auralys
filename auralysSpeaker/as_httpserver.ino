@@ -29,10 +29,21 @@ void httpServerLoop()
             req_content_length = -1;
             header_content_length = -1;
 
-            LOG_MSGLN("New Client.");
+            LOG_MSGLN("\n +++++++++++++++++++\nNew Client.");
+
+
+            if((httpCurrentTime - httpPreviousTime > httpTimeoutTime2S))
+            {
+                LOG_MSGLN(">>>> TIMEOUT");
+            }
+
+            if( !(client.connected()))
+            {
+                LOG_MSGLN(">>>> CLIENT NOT CONNECTED");
+            }
 
             String currentLine = "";
-            while( client.connected() && httpCurrentTime - httpPreviousTime <= httpTimeoutTime2S )
+            while( client.connected() && (httpCurrentTime - httpPreviousTime <= httpTimeoutTime2S))
             {
                 httpCurrentTime = millis();
                 if( client.available())
@@ -104,7 +115,9 @@ void httpServerLoop()
                                 LOG_MSG("POST request for set-position: ");
                                 displayCtrlMsgTemp("SET_POSITION", 5);
 
-                                setMksMotorPosition3(1, 100, 20, absoluteAxis);
+                                // setMksMotorPosition3(1, 1000, 100, absoluteAxis);
+
+                                setMksMotorPosition3(1, 300, 10, absoluteAxis);
 
                                 String post_param = "";
                                 char p;
@@ -198,6 +211,7 @@ void httpServerLoop()
                             client.println();
                             client.println();
 
+                            client.flush();
                             client.clear();
 
                             // clear web request
@@ -219,10 +233,12 @@ void httpServerLoop()
                         currentLine += c; // add it to the end of the currentLine
                     }
                 }
-                else
-                {
-                    client.clear();
-                }
+                // else
+                // {
+                // LOG_MSGLN(">>>> CLEAR CLIENT");
+                ////client.clear();
+                // delay(100);
+                // }
             }
 
 
@@ -238,6 +254,7 @@ void httpServerLoop()
             // position_safezone_flag = false;
             // }
 
+            client.clear();
             client.stop();
         }
     }
