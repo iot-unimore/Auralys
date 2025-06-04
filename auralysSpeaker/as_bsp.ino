@@ -335,12 +335,12 @@ void bspSetup()
         while((i < BSP_RETRY_MAX) && (false == wifi_connected))
         {
             i++;
-            displayCtrlMsg("WiFi Connect..");
+            displayCtrlMsg((char*) "WiFi Connect..");
             displayLoop();
             bspEnableWiFi();
             if( false == wifi_connected )
             {
-                displayCtrlMsg("WiFi failed..");
+                displayCtrlMsg((char*) "WiFi failed..");
                 displayLoop();
                 bspDisableWiFi();
                 delay(2000);
@@ -352,7 +352,7 @@ void bspSetup()
         {
             ledRgbSetColor(ledRgbColorBlue);
             bspDisplayCtrlFullscreen = true;
-            displayCtrlMsg("Config Mode..");
+            displayCtrlMsg((char*) "Config Mode..");
             displayLoop();
             bspWiFiConfig(0);
             bspDisplayCtrlFullscreen = false;
@@ -362,7 +362,7 @@ void bspSetup()
     {
         ledRgbSetColor(ledRgbColorBlue);
         bspDisplayCtrlFullscreen = true;
-        displayCtrlMsg("Config Mode..");
+        displayCtrlMsg((char*) "Config Mode..");
         displayLoop();
         bspWiFiConfig(0);
         bspDisplayCtrlFullscreen = false;

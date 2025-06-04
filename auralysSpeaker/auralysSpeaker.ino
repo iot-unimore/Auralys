@@ -213,6 +213,10 @@ unsigned long bspWakeUpMillis = 0;
 
 /* display status message */
 char bspDisplayCtrlMsg[64];
+
+char bspDisplayLogMsg[2][21];
+bool bspDisplayLogMsgIdx = 0;
+
 bool bspDisplayCtrlFullscreen = false;
 uint8_t bspDisplayCtrlTimeout = 0;
 
@@ -358,8 +362,6 @@ uint8_t txBuffer[64]; // send data array
 uint8_t rxBuffer[64]; // Receive data array
 uint8_t rxCnt = 0; // Receive data count
 
-#define AXIS_INIT (163840 / 4) // (163840 * 2)
-int32_t absoluteAxis = AXIS_INIT; // 163840;           //absolute coordinates
 uint8_t mksMotorSlaveAddr = 0x01;
 
 int32_t mksMotorMax = (163840 * 10);
@@ -474,7 +476,7 @@ void setup()
     // Setup platform and check for WiFi Manager connection
     bspSetup();
 
-    displayCtrlMsg("NTP Connect..");
+    displayCtrlMsg((char*) "NTP Connect..");
     displayLoop();
     ntpSetup();
     displayClearCtrlMsg();
@@ -490,7 +492,7 @@ void setup()
      * This will happen only at boot.
      */
     ledRgbSetColor(ledRgbColorViolet);
-    displayCtrlMsg("Check FW Update..");
+    displayCtrlMsg((char*) "Check FW Update..");
     displayLoop();
     if( !httpUpdate_flag )
     {
@@ -502,7 +504,7 @@ void setup()
     ledRgbSetColor(ledRgbColorOff);
 
     /* fire up the http server */
-    displayCtrlMsg("Run WebServer..");
+    displayCtrlMsg((char*) "Run WebServer..");
     httpServerSetup();
 
     /* motion sensor */
@@ -535,7 +537,7 @@ void setup()
         NULL, // <--- you probabbly don't need this (from what you have described)
         1); // <--- core: 0 or 1 (Arduino by default runs its code on core 1)
 
-    displayCtrlMsg("Ready...");
+    displayCtrlMsg((char*) "Ready...");
 }
 
 /* running display loop on a separate core of S3 */

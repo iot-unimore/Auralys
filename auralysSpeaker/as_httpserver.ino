@@ -30,16 +30,16 @@ void httpServerLoop()
             req_content_length = -1;
             header_content_length = -1;
 
-            LOG_MSGLN("\n +++++++++++++++++++\nNew Client.");
+            LOG_MSGLN("\n[HTTPSERVER] New Client.");
 
             if((httpCurrentTime - httpPreviousTime > httpTimeoutTime2S))
             {
-                LOG_MSGLN(">>> TIMEOUT");
+                LOG_MSGLN("[HTTPSERVER] TIMEOUT");
             }
 
             if( !(client.connected()))
             {
-                LOG_MSGLN(">>> CLIENT NOT CONNECTED");
+                LOG_MSGLN("[HTTPSERVER] CLIENT NOT CONNECTED");
             }
 
             String currentLine = "";
@@ -118,7 +118,7 @@ void httpServerLoop()
                             {
                                 cmd_ctrl = CTRL_CMD_POSITION_GET;
                                 LOG_MSGLN("GET request for get-position");
-                                displayCtrlMsgTemp("GET_POSITION", 5);
+                                displayCtrlMsgTemp((char*) "GET_POSITION", 5);
                             }
                             else if( header.indexOf("POST /position/set") >= 0 )
                             {

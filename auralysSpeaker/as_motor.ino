@@ -19,20 +19,23 @@ void mksLoop()
         switch( mksMotorCmdQueue[0].command )
         {
             case CTRL_CMD_STOP:
-                LOG_MSGLN("CTRL_CMD_STOP, not supported yet");
                 LOG_MSGLN("GET request for STOP!");
-                displayCtrlMsgTemp("STOP!", 5);
+                displayCtrlMsgTemp((char*) "STOP!", 5);
+                displayCtrlLogMsg((char*) "CMD_STOP, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_POSITION_GET:
                 LOG_MSGLN("CTRL_CMD_POSITION_GET, not supported yet");
+                displayCtrlLogMsg((char*) "CMD_POS_GET, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_POSITION_SET:
                 LOG_MSGLN("CTRL_CMD_POSITION_SET, adding to queue");
-                displayCtrlMsgTemp("SET_POSITION", 5);
+                displayCtrlMsgTemp((char*) "SET_POSITION", 5);
+                displayCtrlLogMsg((char*) "SET_POS");
+
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_EXEC;
 
                 // Sanity check
@@ -41,73 +44,90 @@ void mksLoop()
                     ackStatus = setMksMotorPosition3(mksMotorSlaveAddr, mksMotorSpeed, mksMotorAccel, mksMotorCmdQueue[0].parami_01);
                     if( ackStatus == 2 )
                     {
-                        absoluteAxis = -1 * absoluteAxis;
                         mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                        displayCtrlLogMsg((char*) "SET_POS: Ok");
                     }
                     else
                     {
                         mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_ERROR;
+                        displayCtrlLogMsg((char*) "SET_POS: Error");
                     }
                 }
                 else
                 {
                     // skip command
                     mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                    displayCtrlLogMsg((char*) "SET_POS: Skipped");
                 }
 
                 break;
 
             case CTRL_CMD_SPEED_GET:
                 LOG_MSGLN("CTRL_CMD_SPEED_GET, not supported yet");
+                displayCtrlLogMsg((char*) "CMD_SPEED_GET, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_ACCEL_SET:
                 LOG_MSGLN("CTRL_CMD_ACCEL_SET, not supported yet");
+                displayCtrlLogMsg((char*) "CMD_ACCEL_SET, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_ACCEL_GET:
                 LOG_MSGLN("CTRL_CMD_ACCEL_GET, not supported yet");
+                displayCtrlLogMsg((char*) "CMD_ACCEL_GET, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_SPEED_SET:
-                LOG_MSGLN("CTRL_CMD_SPEED_SET, not supported yet");
+                LOG_MSGLN("CTRL_CMD_SPEED_SET, not supported yet")
+                displayCtrlLogMsg((char*) "CMD_SPEED_SET, skip");;
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_MKS_RESET:
                 LOG_MSGLN("CTRL_CMD_MKS_RESET, not supported yet");
+                displayCtrlLogMsg((char*) "CMD_MKS_RESET, skip");
                 /* add here other motor control operations, like stop */
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_STATUS_GET:
                 LOG_MSGLN("CTRL_CMD_STATUS_GET, not supported yet");
+                displayCtrlLogMsg((char*) "CMD_STATUS_GET, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_ZERO_SET:
+                LOG_MSGLN("CTRL_CMD_ZERO_SET");
+                displayCtrlLogMsg((char*) "CMD_ZERO_SET");
+
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_EXEC;
                 ackStatus = mksSetAxisZero(mksMotorSlaveAddr);
                 if( ackStatus == 1 )
                 {
                     mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                    displayCtrlLogMsg((char*) "CMD_ZERO_SET, Ok");
+
                 }
                 else
                 {
                     mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_ERROR;
+                    displayCtrlLogMsg((char*) "CMD_ZERO_SET, Error");
+
                 }
                 break;
 
             case CTRL_CMD_GO_ZERO:
-                LOG_MSGLN("CTRL_CMD_GO_HOME, not supported yet");
+                LOG_MSGLN("CTRL_CMD_GO_ZERO, not supported yet");
+                displayCtrlLogMsg((char*) "CMD_GO_ZERO, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             default:
                 LOG_MSGLN("Unknown MKS command, skipped");
+                displayCtrlLogMsg((char*) "CMD Unknown, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
         }
 
@@ -309,17 +329,8 @@ int8_t setMksMotorPosition3(uint8_t slaveAddr, uint16_t speed, uint8_t acc, int3
         if( ackStatus == 2 )
         {
             // Receipt of position control complete response
-            // if( absoluteAxis == 0 )
-            // {
-            // absoluteAxis = AXIS_INIT; // 81920;//163840;    //Set absolute coordinates
-            // }
-            // else
-            // {
-            // absoluteAxis = 0;
-            // }
 
-            // absoluteAxis = -1 * absoluteAxis;
-
+            /* nothing to do */
         }
         else
         {
