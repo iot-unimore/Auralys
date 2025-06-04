@@ -15,6 +15,22 @@ void bspReboot()
     // delay(200);
 }
 
+void bspReset()
+{
+    uint8_t tmp8;
+    WiFiManager wm;
+
+    /* wifiManager erase credentials */
+    wm.resetSettings();
+
+    /* deactivate device */
+    bspActivated = 0;
+    eepromReadBytes(&tmp8, EE_SYS_INIT_FLAG_OFFS, EE_SYS_INIT_FLAG_SIZE);
+    tmp8 &= ~(EE_SYS_INIT_BSPACTIVATED_MSK);
+    eepromWriteBytes(EE_SYS_INIT_FLAG_OFFS, &tmp8, EE_SYS_INIT_FLAG_SIZE);
+    EEPROM.commit();
+}
+
 void bspPrintMac(const unsigned char* mac)
 {
     LOG_PRINTF("%02X:%02X:%02X:%02X:%02X:%02X\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -48,45 +64,20 @@ bool bspEnableWiFi()
     bool rv = false;
     WiFiManager wm;
 
-    /* hostname from hw */
-
-    // FIX THIS
-
-    // for(uint8_t i = 0; i < 9; i++)
-    // {
-    // device_hostname[15 - i] = hw_config.hw_pcb_uuid4[31 - i];
-    // }
+    bspSetCpuFrequencyMhz(BSP_CPU_MHZ_MAX);
 
     LOG_MSG("[HTTP] device hostname:");
     LOG_MSGLN(device_hostname);
 
-    // WiFi.setHostname("ilBert001");
+
     WiFi.setHostname(device_hostname);
     WiFi.mode(WIFI_STA);
     WiFi.disconnect(false);
 
-    const char* wm_menu[] = { "wifi", "exit" };
-    wm.setShowInfoUpdate(false);
-    wm.setShowInfoErase(false);
-    wm.setMenu(wm_menu, 2);
-
-    wm.setTitle("AuralysSpeaker");
-
-    // force to be Google DNS as a workaround for Android phones
-    wm.setAPStaticIPConfig(IPAddress(8, 8, 8, 8), IPAddress(8, 8, 8, 8), IPAddress(255, 255, 255, 0));
-
-    // wm.setClass("invert");
-    // wm.setConnectTimeout(20); // how long to try to connect for before continuing
-    wm.setConfigPortalTimeout(360); // auto close configportal after n seconds
-    wm.setCaptivePortalEnable(true); // if false, disable captive portal redirection
-    wm.setAPClientCheck(false); // if false, timeout captive portal even if a STA client connected to softAP (false)
-    // wifi scan settings
-    // wm.setRemoveDuplicateAPs(false); // do not remove duplicate ap names (true)
-    wm.setMinimumSignalQuality(15); // set min RSSI (percentage) to show in scans, null = 8%
-    // wm.setShowInfoErase(false);      // do not show erase button on info page
-    // wm.setScanDispPerc(true);       // show RSSI as percentage not graph icons
-    wm.setBreakAfterConfig(true); // always exit configportal even if wifi save fails
-    wm.setSaveConnect(true); // lets you disable automatically connecting after save from webportal
+    wm.setTitle("Auralys");
+    wm.setConfigPortalTimeout(1); // auto close configportal after n seconds
+    wm.setAPClientCheck(true); // avoid timeout if client connected to softap
+    wm.setMinimumSignalQuality(20); // set min RSSI (percentage) to show in scans, null = 8%
 
     rv = wm.autoConnect(device_hostname);
 
@@ -108,6 +99,8 @@ bool bspEnableWiFi()
 
         rv = false;
     }
+
+    bspSetCpuFrequencyMhz(bspCpuMhzPrevious);
 
     return rv;
 }
@@ -240,15 +233,144 @@ void bspI2CScan()
     }
 }
 
-void bspInit()
+void bspWiFiConfig(uint32_t cfgTimeout)
+{
+    bool rv = false;
+    WiFiManager wm;
+
+    LOG_MSGLN("[BSP] entering config webportal");
+
+    bspSetCpuFrequencyMhz(BSP_CPU_MHZ_MAX);
+
+    WiFi.setHostname(device_hostname);
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(false);
+
+    /*
+     * erase wifi credentials and prepare WiFiManager settings
+     */
+    wm.resetSettings();
+
+    const char* wm_menu[] = { "wifi", "exit" };
+    wm.setShowInfoUpdate(false);
+    wm.setShowInfoErase(false);
+    wm.setMenu(wm_menu, 2);
+
+
+    wm.setTitle("Auralys, Hello!");
+
+    // force to be Google DNS as a workaround for Android phones
+    wm.setAPStaticIPConfig(IPAddress(8, 8, 8, 8), IPAddress(8, 8, 8, 8), IPAddress(255, 255, 255, 0));
+
+    // wm.setClass("invert");
+    // wm.setConnectTimeout(20); // how long to try to connect for before continuing
+
+    if( cfgTimeout > 0 )
+    {
+        wm.setConfigPortalTimeout(360); // auto close configportal after n seconds
+    }
+
+    wm.setCaptivePortalEnable(true); // if false, disable captive portal redirection
+    wm.setAPClientCheck(false); // if false, timeout captive portal even if a STA client connected to softAP (false)
+    // wifi scan settings
+    // wm.setRemoveDuplicateAPs(false);     // do not remove duplicate ap names (true)
+    wm.setMinimumSignalQuality(15); // set min RSSI (percentage) to show in scans, null = 8%
+    // wm.setShowInfoErase(false);          // do not show erase button on info page
+    // wm.setScanDispPerc(true);            // show RSSI as percentage not graph icons
+    wm.setBreakAfterConfig(true); // always exit configportal even if wifi save fails
+    wm.setSaveConnect(true); // lets you disable automatically connecting after save from webportal
+
+    rv = wm.autoConnect(device_hostname);
+
+    if( rv )
+    {
+        LOG_MSGLN("[BSP] wifiConfig .. OK");
+
+    }
+    else
+    {
+        LOG_MSGLN("[BSP] wifiConfig failure");
+    }
+
+
+
+    /* set bsp_activation_flag */
+    if( rv )
+    {
+        uint8_t tmp8;
+
+        LOG_MSGLN("[BSP] device activated. ");
+        bspActivated = 1;
+        eepromReadBytes(&tmp8, EE_SYS_INIT_FLAG_OFFS, EE_SYS_INIT_FLAG_SIZE);
+        tmp8 |= (EE_SYS_INIT_BSPACTIVATED_MSK);
+        eepromWriteBytes(EE_SYS_INIT_FLAG_OFFS, &tmp8, EE_SYS_INIT_FLAG_SIZE);
+        EEPROM.commit();
+    }
+
+    bspSetCpuFrequencyMhz(bspCpuMhzPrevious);
+
+    delay(300);
+    bspReboot();
+}
+
+void bspSetup()
 {
     // bspConfig = BSP_CONFIG_DEFAULT;
     // bspChipID = ESP.getChipModel();
 
-    /* DEFAULT: no wifi, no bt, low speed */
-    bspEnableWiFi();
+    /* hostname from hw */
+    char sbuf[16];
+    sprintf(sbuf, "%012llx\r\n", ESP.getEfuseMac());
+    for(int i = 0; i < 9; i++)
+    {
+        // device_hostname[15 - i] = hw_config.hw_pcb_uuid4[31 - i];
+        device_hostname[15 - i] = sbuf[12 - i];
+    }
+
+    if( bspActivated == true )
+    {
+        ledRgbSetColor(ledRgbColorWhite);
+
+        int i = 0;
+        while((i < BSP_RETRY_MAX) && (false == wifi_connected))
+        {
+            i++;
+            displayCtrlMsg("WiFi Connect..");
+            displayLoop();
+            bspEnableWiFi();
+            if( false == wifi_connected )
+            {
+                displayCtrlMsg("WiFi failed..");
+                displayLoop();
+                bspDisableWiFi();
+                delay(2000);
+            }
+        }
+
+        /* fallback on config */
+        if( false == wifi_connected )
+        {
+            ledRgbSetColor(ledRgbColorBlue);
+            bspDisplayCtrlFullscreen = true;
+            displayCtrlMsg("Config Mode..");
+            displayLoop();
+            bspWiFiConfig(0);
+            bspDisplayCtrlFullscreen = false;
+        }
+    }
+    else
+    {
+        ledRgbSetColor(ledRgbColorBlue);
+        bspDisplayCtrlFullscreen = true;
+        displayCtrlMsg("Config Mode..");
+        displayLoop();
+        bspWiFiConfig(0);
+        bspDisplayCtrlFullscreen = false;
+    }
+
+
+    ledRgbSetColor(ledRgbColorOff);
 
     /* DEFAULT: Start at 10Mhz for low power consumption */
     // bspSetCpuFrequencyMhz(BSP_CPU_MHZ_DEFAULT);
-
 }

@@ -18,90 +18,105 @@ void displayLoop()
     char sbuf[64];
     struct tm timeinfo;
 
-    display.clearDisplay();
-
-    display.drawFastHLine(0, 10, 128, SH110X_WHITE);
-    display.drawFastHLine(0, 54, 128, SH110X_WHITE);
-
-    // #0 : date and time
-    if( true == wifi_connected )
-    // if(WiFi.isConnected())
+    if( bspDisplayCtrlFullscreen )
     {
-        IPAddress eth_ip_addr = WiFi.localIP();
+        display.clearDisplay();
 
-        ntpPrintLocalTime();
-
-        if( !getLocalTime(&timeinfo))
-        {
-            LOG_MSGLN("[DISPLAY][NTP][ERROR] Failed to obtain time");
-        }
-        else
-        {
-            sprintf(sbuf, "%04d-%02d-%02d   %02d:%02d:%02d",
-                    timeinfo.tm_year + 1900,
-                    timeinfo.tm_mon,
-                    timeinfo.tm_mday,
-                    timeinfo.tm_hour,
-                    timeinfo.tm_min,
-                    timeinfo.tm_sec
-                    );
-
-            display.setCursor(0, 0);
-            display.setTextSize(1);
-            display.setTextColor(SH110X_WHITE);
-            // display.setTextColor(SH110X_BLACK, SH110X_WHITE); // 'inverted' text
-            display.print(sbuf);
-
-            // Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-        }
-
-
-        // #1: IP ADDR
-        display.setCursor(0, LINE_ORIGIN);
-        display.setTextSize(1);
-        display.setTextColor(SH110X_WHITE);
-        sprintf(sbuf, "IP : %3d.%3d.%3d.%3d", eth_ip_addr[0], eth_ip_addr[1], eth_ip_addr[2], eth_ip_addr[3]);
-        display.print(sbuf);
-    }
-
-    {
-        // #2: ACCELEROMETER
-        display.setCursor(0, LINE_ORIGIN + LINE_SIZE);
-        display.setTextSize(1);
-        display.setTextColor(SH110X_WHITE);
-        sprintf(sbuf, "XYZ: %1.2f %1.2f %1.2f", acc_x, acc_y, acc_z);
-        display.print(sbuf);
-    }
-
-    uint8_t l = 0;
-    for(int i = 34; i < 45; i += 10)
-    {
-        display.setCursor(0, i);
-        display.setTextSize(1);
-        display.setTextColor(SH110X_WHITE);
-        sprintf(sbuf, "%01d: ", l++);
-        display.print(sbuf);
-    }
-
-    // ctrl message
-    {
         snprintf(sbuf, 63, bspDisplayCtrlMsg);
         display.setTextSize(1);
-        display.setCursor(0, 56);
+        display.setCursor(0, 24);
+        display.print(device_hostname);
+        display.setCursor(0, 44);
         display.print(sbuf);
-
-        if( bspDisplayTimeout == 1 )
-        {
-            displayClearCtrlMsg();
-        }
-        if( bspDisplayTimeout > 0 )
-        {
-            bspDisplayTimeout--;
-        }
-
+        display.display();
     }
+    else
+    {
+        display.clearDisplay();
 
-    display.display();
+        display.drawFastHLine(0, 10, 128, SH110X_WHITE);
+        display.drawFastHLine(0, 54, 128, SH110X_WHITE);
+
+        // #0 : date and time
+        if( true == wifi_connected )
+        // if(WiFi.isConnected())
+        {
+            IPAddress eth_ip_addr = WiFi.localIP();
+
+            ntpPrintLocalTime();
+
+            if( !getLocalTime(&timeinfo))
+            {
+                LOG_MSGLN("[DISPLAY][NTP][ERROR] Failed to obtain time");
+            }
+            else
+            {
+                sprintf(sbuf, "%04d-%02d-%02d   %02d:%02d:%02d",
+                        timeinfo.tm_year + 1900,
+                        timeinfo.tm_mon,
+                        timeinfo.tm_mday,
+                        timeinfo.tm_hour,
+                        timeinfo.tm_min,
+                        timeinfo.tm_sec
+                        );
+
+                display.setCursor(0, 0);
+                display.setTextSize(1);
+                display.setTextColor(SH110X_WHITE);
+                // display.setTextColor(SH110X_BLACK, SH110X_WHITE); // 'inverted' text
+                display.print(sbuf);
+
+                // Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+            }
+
+
+            // #1: IP ADDR
+            display.setCursor(0, LINE_ORIGIN);
+            display.setTextSize(1);
+            display.setTextColor(SH110X_WHITE);
+            sprintf(sbuf, "IP : %3d.%3d.%3d.%3d", eth_ip_addr[0], eth_ip_addr[1], eth_ip_addr[2], eth_ip_addr[3]);
+            display.print(sbuf);
+        }
+
+        {
+            // #2: ACCELEROMETER
+            display.setCursor(0, LINE_ORIGIN + LINE_SIZE);
+            display.setTextSize(1);
+            display.setTextColor(SH110X_WHITE);
+            sprintf(sbuf, "XYZ: %1.2f %1.2f %1.2f", acc_x, acc_y, acc_z);
+            display.print(sbuf);
+        }
+
+        uint8_t l = 0;
+        for(int i = 34; i < 45; i += 10)
+        {
+            display.setCursor(0, i);
+            display.setTextSize(1);
+            display.setTextColor(SH110X_WHITE);
+            sprintf(sbuf, "%01d: ", l++);
+            display.print(sbuf);
+        }
+
+        // ctrl message
+        {
+            snprintf(sbuf, 63, bspDisplayCtrlMsg);
+            display.setTextSize(1);
+            display.setCursor(0, 56);
+            display.print(sbuf);
+
+            if( bspDisplayCtrlTimeout == 1 )
+            {
+                displayClearCtrlMsg();
+            }
+            if( bspDisplayCtrlTimeout > 0 )
+            {
+                bspDisplayCtrlTimeout--;
+            }
+
+        }
+
+        display.display();
+    }
 }
 
 void displayClear()
@@ -113,6 +128,22 @@ void displayClear()
 void displaySplashScreen()
 {
     char sbuf[64];
+    char sbuild[4] = "";
+
+    switch( SW_VER_BUILD )
+    {
+        case 0:
+            sprintf(sbuild, "rel"); break;
+        case 1:
+            sprintf(sbuild, "dbg"); break;
+        case 2:
+            sprintf(sbuild, "rel-qa"); break;
+        case 3:
+            sprintf(sbuild, "dbg-qa"); break;
+        default:
+            sprintf(sbuild, "none"); break;
+    }
+
 
     display.clearDisplay();
 
@@ -125,10 +156,10 @@ void displaySplashScreen()
     display.setTextSize(1);
     display.print("by UniMore");
 
-    display.setCursor(4, 40);
+    display.setCursor(2, 44);
     display.setTextSize(1);
     display.setTextColor(SH110X_WHITE);
-    sprintf(sbuf, " 2025 - version %1d.%1d", SW_VER_MJR, SW_VER_MIN);
+    sprintf(sbuf, "2025 - ver.%1d.%1d.%1d.%s", SW_VER_MJR, SW_VER_MIN, SW_VER_REV, sbuild);
     display.print(sbuf);
 
     // display.setTextColor(SH110X_BLACK, SH110X_WHITE); // 'inverted' text
@@ -160,7 +191,7 @@ void displayCtrlMsgTemp(char* msg, uint8_t timeout)
 
     if( NULL != msg )
     {
-        bspDisplayTimeout = timeout;
+        bspDisplayCtrlTimeout = timeout;
         snprintf(bspDisplayCtrlMsg, 63, msg);
 
     }

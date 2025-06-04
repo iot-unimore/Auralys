@@ -43,6 +43,7 @@
 
 #include "stdint.h"
 #include "esp_adc/adc_continuous.h"
+#include "esp_task_wdt.h"
 #include "esp32/ulp.h"
 #include "soc/rtc_cntl_reg.h"
 #include "driver/rtc_io.h"
@@ -76,7 +77,7 @@
 
 /* Software Revision - BEGIN */
 #define SW_VER_MJR    (0) /* NOTE: 0->255, 1byte coded */
-#define SW_VER_MIN    (1) /* NOTE: 0->15,   4bit coded */
+#define SW_VER_MIN    (2) /* NOTE: 0->15,   4bit coded */
 #define SW_VER_REV    (1) /* NOTE: 0->3,    2bit coded  */
 
 /* switch define for debug/release + qa build type */
@@ -168,7 +169,7 @@ HW_PCB_CONFIG_T hw_config = {
 
 
 /* ============================================================================= */
-/* EXTERNAL libaries (LilyGo T-7080)                                             */
+/* EXTERNAL libaries                                                             */
 /* ============================================================================= */
 
 /* display lib */
@@ -198,7 +199,9 @@ Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, 
 #define BSP_BTN0_09                                                             (9)
 #define BSP_BTN0_12                                                            (12)
 
-#define BSP_I2C_PROBE_RETRY_MAX                                                 (7)
+#define BSP_RETRY_MAX                                                           (3)
+
+#define BSP_DELAY_3MS                                                           (3)
 
 /* CPU speed control */
 uint32_t bspCpuMhzCurrent = BSP_CPU_MHZ_DEFAULT;
@@ -210,7 +213,8 @@ unsigned long bspWakeUpMillis = 0;
 
 /* display status message */
 char bspDisplayCtrlMsg[64];
-uint8_t bspDisplayTimeout = 0;
+bool bspDisplayCtrlFullscreen = false;
+uint8_t bspDisplayCtrlTimeout = 0;
 
 ///* buttons control */
 // volatile uint8_t bsp_btn0 = 0;
@@ -277,6 +281,15 @@ String header;
 #define CTRL_CMD_POSITION_SET (3)
 #define CTRL_CMD_SPEED_GET    (4)
 #define CTRL_CMD_SPEED_SET    (5)
+#define CTRL_CMD_ACCEL_GET    (6)
+#define CTRL_CMD_ACCEL_SET    (7)
+#define CTRL_CMD_RESET        (8)
+#define CTRL_CMD_REBOOT       (9)
+#define CTRL_CMD_MKS_RESET    (10)
+#define CTRL_CMD_STATUS_GET   (11)
+#define CTRL_CMD_ZERO_SET     (12)
+#define CTRL_CMD_GO_ZERO      (13)
+#define CTRL_CMD_MINMAX_SET   (14)
 
 /* ============================================================================= */
 /* NTP Time GLOBALS&DEFINES SECTION                                               */
@@ -297,7 +310,7 @@ ESP32Time esp32_rtc(0);
 // TimeChangeRule myDST = { "CST", Last, Sun, Mar, 2, +120 };
 // TimeChangeRule mySTD = { "CET", Last, Sun, Oct, 3, +60 };
 
-///* UTC TimeZone is the default for "ilBert" */
+///* UTC TimeZone is the default for "Auralys" */
 // Timezone myTZ(myDST, mySTD);
 
 // TimeChangeRule* tcr;
@@ -341,14 +354,35 @@ uint32_t ledRgbColorOff = LED_RGB_OFF;
 /*  MKS MOTOR GLOBALS & DEFINES SECTION                                          */
 /* ***************************************************************************** */
 
-
 uint8_t txBuffer[64]; // send data array
 uint8_t rxBuffer[64]; // Receive data array
 uint8_t rxCnt = 0; // Receive data count
 
-#define AXIS_INIT (163840 * 2)
+#define AXIS_INIT (163840 / 4) // (163840 * 2)
 int32_t absoluteAxis = AXIS_INIT; // 163840;           //absolute coordinates
 uint8_t mksMotorSlaveAddr = 0x01;
+
+int32_t mksMotorMax = (163840 * 10);
+int32_t mksMotorMin = (-163840 * 10);
+uint16_t mksMotorSpeed = 250;
+uint16_t mksMotorAccel = 3;
+bool mksMotorDirCW = true;
+
+typedef struct mksMotorCmd_ {
+    int8_t status;
+    int8_t command;
+    int32_t parami_01;
+    int32_t parami_02;
+    float paramf_01;
+    float paramf_02;
+}mksMotorCmd_t;
+
+mksMotorCmd_t mksMotorCmdQueue[1] = { 0 };
+
+#define MKS_MOTOR_STATUS_ERROR   (-1)
+#define MKS_MOTOR_STATUS_IDLE     (0)
+#define MKS_MOTOR_STATUS_BUSY     (1)
+#define MKS_MOTOR_STATUS_EXEC     (2)
 
 
 /* ============================================================================= */
@@ -429,17 +463,17 @@ void setup()
 #endif
 #endif
 
+    eepromSetup();
+
     // Display splash screen
     displaySetup();
     displaySplashScreen();
     delay(2000);
     displayClear();
 
-    // Init platform and check for WiFi Manager connection
-    ledRgbSetColor(ledRgbColorWhite);
-    displayCtrlMsg("WiFi Connect..");
-    displayLoop();
-    bspInit();
+    // Setup platform and check for WiFi Manager connection
+    bspSetup();
+
     displayCtrlMsg("NTP Connect..");
     displayLoop();
     ntpSetup();
@@ -488,6 +522,19 @@ void setup()
         NULL, // <--- you probabbly don't need this (from what you have described)
         0); // <--- core: 0 or 1 (Arduino by default runs its code on core 1)
 
+
+    /*
+       spawn motor Queue refresh on a separate core
+     */
+    xTaskCreatePinnedToCore(
+        &motorQueueRefresh, // <--- <our function name
+        "motorQueueRefresh", // <--- just some string for identification
+        20000, // <--- this is important - reserve enough stack otherwise strane things will happen
+        NULL, // <---- you can use this if you want to pass parameter to task function, NULL otherwise
+        1, // <--- 1 = normal priority, 0 = low priority, 2 = high priority
+        NULL, // <--- you probabbly don't need this (from what you have described)
+        1); // <--- core: 0 or 1 (Arduino by default runs its code on core 1)
+
     displayCtrlMsg("Ready...");
 }
 
@@ -500,6 +547,7 @@ void displayRefresh(void* param)
     {
         motionLoop();
         displayLoop();
+        yield();
         delay(300);
 // #ifdef DEBUG
 // Serial.print("displayRefresh() running on core ");
@@ -508,57 +556,20 @@ void displayRefresh(void* param)
     }
 }
 
+/* running display loop on a separate core of S3 */
+void motorQueueRefresh(void* param)
+{
+    while( 1 )
+    {
+        mksLoop();
+        yield();
+        delay(100);
+    }
+}
+
 /* main loop */
 void loop()
 {
-// uint8_t ackStatus;
-
     ntpLoop();
-
     httpServerLoop();
-
-#if 0
-    /* mks Loop: mks command every 2s */
-    ledRgbBlink(ledRgbColorGreen, ONESEC_MSECS);
-
-    // Slave address=1, speed=100RPM, acceleration=200, absolute coordinates
-    mksPositionMode3Run(1, 5, 2, absoluteAxis);
-
-    // Wait for the position control to start answering
-    ackStatus = mksWaitingForACK(3000);
-
-    if( ackStatus == 1 )
-    {
-        // Position control starts
-
-        // Wait for the position control to complete the response
-        ackStatus = mksWaitingForACK(0);
-        if( ackStatus == 2 )
-        {
-            // Receipt of position control complete response
-            if( absoluteAxis == 0 )
-            {
-                absoluteAxis = AXIS_INIT; // 81920;//163840;    //Set absolute coordinates
-            }
-            else
-            {
-                absoluteAxis = 0;
-            }
-
-        }
-        else
-        {
-            // Location complete reply not received
-            ledRgbBlinkN(ledRgbColorRed, 0.5 * ONESEC_MSECS, 3);
-        }
-    }
-    else
-    {
-        // Position control failed
-        ledRgbBlinkN(ledRgbColorViolet, 0.5 * ONESEC_MSECS, 3);
-    }
-
-
-    delay(2000);
-#endif
 }

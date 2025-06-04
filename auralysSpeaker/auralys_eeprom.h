@@ -17,7 +17,7 @@
 /* section shortcuts */
 #define EE_SYS_ADDR                                                   (EE_SECTION_SYSTEM_ADDR)
 
-/* ilBert system eeprom map */
+/* Auralys system eeprom map */
 #define EE_SYS_SIGNATURE_OFFS                                                    (EE_SYS_ADDR)
 #define EE_SYS_SIGNATURE_SIZE                                                              (3)
 #define EE_SYS_DESCRIPTOR_MJR                  (EE_SYS_SIGNATURE_OFFS + EE_SYS_SIGNATURE_SIZE)

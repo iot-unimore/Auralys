@@ -5,11 +5,138 @@
 void mksSetup()
 {
     Serial1.begin(UART_MKS_BAUD, SERIAL_8N1, UART_MKS_RX_PIN, UART_MKS_TX_PIN);
+
+    /* TODO: set motor mode here, depending on the role of the unit */
+    /*       closed loop for speaker, serial_vfoc for poles */
 }
 
 void mksLoop()
 {
+    uint8_t ackStatus;
 
+    if( MKS_MOTOR_STATUS_BUSY == mksMotorCmdQueue[0].status )
+    {
+        switch( mksMotorCmdQueue[0].command )
+        {
+            case CTRL_CMD_STOP:
+                LOG_MSGLN("CTRL_CMD_STOP, not supported yet");
+                LOG_MSGLN("GET request for STOP!");
+                displayCtrlMsgTemp("STOP!", 5);
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                break;
+
+            case CTRL_CMD_POSITION_GET:
+                LOG_MSGLN("CTRL_CMD_POSITION_GET, not supported yet");
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                break;
+
+            case CTRL_CMD_POSITION_SET:
+                LOG_MSGLN("CTRL_CMD_POSITION_SET, adding to queue");
+                displayCtrlMsgTemp("SET_POSITION", 5);
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_EXEC;
+
+                // Sanity check
+                if((mksMotorCmdQueue[0].parami_01 < mksMotorMax) && (mksMotorCmdQueue[0].parami_01 > mksMotorMin))
+                {
+                    ackStatus = setMksMotorPosition3(mksMotorSlaveAddr, mksMotorSpeed, mksMotorAccel, mksMotorCmdQueue[0].parami_01);
+                    if( ackStatus == 2 )
+                    {
+                        absoluteAxis = -1 * absoluteAxis;
+                        mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                    }
+                    else
+                    {
+                        mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_ERROR;
+                    }
+                }
+                else
+                {
+                    // skip command
+                    mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                }
+
+                break;
+
+            case CTRL_CMD_SPEED_GET:
+                LOG_MSGLN("CTRL_CMD_SPEED_GET, not supported yet");
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                break;
+
+            case CTRL_CMD_ACCEL_SET:
+                LOG_MSGLN("CTRL_CMD_ACCEL_SET, not supported yet");
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                break;
+
+            case CTRL_CMD_ACCEL_GET:
+                LOG_MSGLN("CTRL_CMD_ACCEL_GET, not supported yet");
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                break;
+
+            case CTRL_CMD_SPEED_SET:
+                LOG_MSGLN("CTRL_CMD_SPEED_SET, not supported yet");
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                break;
+
+            case CTRL_CMD_MKS_RESET:
+                LOG_MSGLN("CTRL_CMD_MKS_RESET, not supported yet");
+                /* add here other motor control operations, like stop */
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                break;
+
+            case CTRL_CMD_STATUS_GET:
+                LOG_MSGLN("CTRL_CMD_STATUS_GET, not supported yet");
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                break;
+
+            case CTRL_CMD_ZERO_SET:
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_EXEC;
+                ackStatus = mksSetAxisZero(mksMotorSlaveAddr);
+                if( ackStatus == 1 )
+                {
+                    mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                }
+                else
+                {
+                    mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_ERROR;
+                }
+                break;
+
+            case CTRL_CMD_GO_ZERO:
+                LOG_MSGLN("CTRL_CMD_GO_HOME, not supported yet");
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                break;
+
+            default:
+                LOG_MSGLN("Unknown MKS command, skipped");
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+        }
+
+    }
+}
+
+int8_t mksCmdRequest(int8_t command, int32_t parami_01, int32_t parami_02, float paramf_01, float paramf_02)
+{
+    if( mksMotorCmdQueue[0].status > 0 )
+    {
+        return 1;
+    }
+
+    if( mksMotorCmdQueue[0].status < 0 )
+    {
+        return -1;
+    }
+
+    /* insert parameter in Queue */
+    mksMotorCmdQueue[0].command = command;
+    mksMotorCmdQueue[0].parami_01 = parami_01;
+    mksMotorCmdQueue[0].parami_02 = parami_02;
+    mksMotorCmdQueue[0].paramf_01 = paramf_01;
+    mksMotorCmdQueue[0].paramf_01 = paramf_02;
+
+    /* signal status */
+    mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_BUSY;
+
+    return 0;
 }
 
 /*
@@ -83,6 +210,8 @@ uint8_t mksWaitingForACK(uint32_t len, uint32_t delayTime)
             retVal = 0;
             break; // timeout, exit while(1)
         }
+
+        delay(BSP_DELAY_3MS);
     }
     return(retVal);
 }
@@ -189,7 +318,7 @@ int8_t setMksMotorPosition3(uint8_t slaveAddr, uint16_t speed, uint8_t acc, int3
             // absoluteAxis = 0;
             // }
 
-            absoluteAxis = -1 * absoluteAxis;
+            // absoluteAxis = -1 * absoluteAxis;
 
         }
         else
@@ -233,4 +362,22 @@ void mksPositionMode3Run(uint8_t slaveAddr, uint16_t speed, uint8_t acc, int32_t
 
     Serial1.write(txBuffer, 11);
 
+}
+
+int8_t mksSetAxisZero(uint8_t slaveAddr)
+{
+    int i = 0;
+    uint16_t checkSum = 0;
+    uint8_t ackStatus;
+
+    txBuffer[i++] = 0xFA;
+    txBuffer[i++] = slaveAddr;
+    txBuffer[i++] = 0x92;
+    txBuffer[i] = mksGetCheckSum(txBuffer, i);
+
+    Serial1.write(txBuffer, (i + 1));
+
+    ackStatus = mksWaitingForACK(5, 3000);
+
+    return ackStatus;
 }
