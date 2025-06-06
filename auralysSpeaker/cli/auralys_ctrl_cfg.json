@@ -11,5 +11,5 @@
     "dF_mm": 1540.0,
     "maxF": 600000.0,
     "minF": -600000.0,
-    "coord_type": "ac"
+    "coord_type": "as"
 }
