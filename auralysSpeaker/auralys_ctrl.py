@@ -259,17 +259,17 @@ def set_position(x, y, z, type):
 
         [lengthL, lengthR, lengthF] = compute_wires_length(x, y, z)
 
-        # print("F: " + str(lengthF))
-        # print("L: " + str(lengthL))
-        # print("R: " + str(lengthR))
+        logger.info("set_position, F: " + str(lengthF))
+        logger.info("set_position, L: " + str(lengthL))
+        logger.info("set_position, R: " + str(lengthR))
 
         mks_position_F = (mks_originF - lengthF) * mks_F_step_mm
         mks_position_L = (mks_originL - lengthL) * mks_L_step_mm
         mks_position_R = (mks_originR - lengthR) * mks_R_step_mm
 
-        # print(mks_position_F)
-        # print(mks_position_L)
-        # print(mks_position_R)
+        logger.info("set_position, mks_F: " + str(mks_position_F))
+        logger.info("set_position, mks_L: " + str(mks_position_L))
+        logger.info("set_position, mks_R: " + str(mks_position_R))
 
         if (
             ((mks_position_F > maxF) or (mks_position_F < minF))
