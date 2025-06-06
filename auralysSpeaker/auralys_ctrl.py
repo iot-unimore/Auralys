@@ -144,10 +144,7 @@ def verify_coord_limits(x, y, z):
 
 def mks_set_length(ip_addr, mks_length):
     url = "http://" + str(ip_addr) + "/position/set/"
-    # print(url)
-    # print(str(int(mks_length)))
     response = requests.post(url, data=str(int(mks_length)))
-    # print("mks_set_length, Response: "+response.text)
     result = json.loads(response.text)
     if result["error"] != 0:
         return -1
@@ -262,17 +259,17 @@ def set_position(x, y, z, type):
 
         [lengthL, lengthR, lengthF] = compute_wires_length(x, y, z)
 
-        print("F: " + str(lengthF))
-        print("L: " + str(lengthL))
-        print("R: " + str(lengthR))
+        # print("F: " + str(lengthF))
+        # print("L: " + str(lengthL))
+        # print("R: " + str(lengthR))
 
         mks_position_F = (mks_originF - lengthF) * mks_F_step_mm
         mks_position_L = (mks_originL - lengthL) * mks_L_step_mm
         mks_position_R = (mks_originR - lengthR) * mks_R_step_mm
 
-        print(mks_position_F)
-        print(mks_position_L)
-        print(mks_position_R)
+        # print(mks_position_F)
+        # print(mks_position_L)
+        # print(mks_position_R)
 
         if (
             ((mks_position_F > maxF) or (mks_position_F < minF))
@@ -464,8 +461,8 @@ if __name__ == "__main__":
     logger.info("-" * 80)
     logger.info("SETUP:")
     logger.info("-" * 80)
-
-    # print(args)
+    if args.verbose:
+        print(args)
     logger.info("-" * 80)
 
     #
