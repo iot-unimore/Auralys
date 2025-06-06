@@ -104,7 +104,7 @@ void eepromSetup()
     if( bspInitialized )
     {
         /* hostname from hw */
-        for(uint8_t i = 0; i < 9; i++)
+        for( uint8_t i = 0; i < 9; i++ )
         {
             device_hostname[15 - i] = hw_config.hw_pcb_uuid4[31 - i];
         }

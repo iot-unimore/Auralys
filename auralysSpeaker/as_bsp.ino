@@ -119,7 +119,7 @@ uint32_t bspScanWiFi()
     {
         LOG_MSG(n);
         LOG_MSGLN("[BSP] WiFi networks found:");
-        for(int i = 0; i < n; ++i)
+        for( int i = 0; i < n; ++i )
         {
             // Print SSID and RSSI for each network found
             LOG_MSG(i + 1);
@@ -192,7 +192,7 @@ void bspI2CScan()
     Serial.println("Scanning...");
 
     nDevices = 0;
-    for(address = 1; address < 127; address++ )
+    for( address = 1; address < 127; address++ )
     {
 
         // The i2c_scanner uses the return value of
@@ -321,7 +321,7 @@ void bspSetup()
     /* hostname from hw */
     char sbuf[16];
     sprintf(sbuf, "%012llx\r\n", ESP.getEfuseMac());
-    for(int i = 0; i < 9; i++)
+    for( int i = 0; i < 9; i++ )
     {
         // device_hostname[15 - i] = hw_config.hw_pcb_uuid4[31 - i];
         device_hostname[15 - i] = sbuf[12 - i];

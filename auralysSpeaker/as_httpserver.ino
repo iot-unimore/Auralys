@@ -65,7 +65,7 @@ void httpServerLoop()
                             LOG_MSG("Got content length = ");
 
                             String val = "";
-                            for(int i = 16 + header.indexOf("Content-Length: "); i < header.length(); i++ )
+                            for( int i = 16 + header.indexOf("Content-Length: "); i < header.length(); i++ )
                             {
                                 val += header.charAt(i);
                             }
@@ -129,7 +129,7 @@ void httpServerLoop()
                                 char p;
 
                                 // position is 0(min)->359(max)
-                                for(int i = 0; i < req_content_length; i++)
+                                for( int i = 0; i < req_content_length; i++ )
                                 {
                                     p = header.charAt(header.length() - req_content_length + i);
                                     post_param += p;

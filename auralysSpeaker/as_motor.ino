@@ -169,7 +169,7 @@ uint8_t mksGetCheckSum(uint8_t* buffer, uint8_t size)
 {
     uint8_t i;
     uint16_t sum = 0;
-    for(i = 0; i < size; i++)
+    for( i = 0; i < size; i++ )
     {
         sum += buffer[i]; // Calculate accumulated value
     }
