@@ -154,7 +154,10 @@ def mks_set_positions(mks_position_F,mks_position_L,mks_position_R):
     logger.info("mks_set_position, mks_L: "+str(mks_position_L))
     logger.info("mks_set_position, mks_R: "+str(mks_position_R))
 
+    #########
     # STEP #0: GET current position and verify status
+    logger.info("mks_set_position: get current status.")
+
     task_args = [
         (ip_addr_F, mks_position_F),
         (ip_addr_L, mks_position_L),
@@ -172,8 +175,10 @@ def mks_set_positions(mks_position_F,mks_position_L,mks_position_R):
     if(err!=0):
         logger.error("mks_set_position: error while executing GET POSITION")
 
-
+    #########
     # STEP #1: SET current position and verify status
+    logger.info("mks_set_position: positioning started.")
+
     task_args = [
         (ip_addr_F, mks_position_F),
         (ip_addr_L, mks_position_L),
@@ -191,7 +196,39 @@ def mks_set_positions(mks_position_F,mks_position_L,mks_position_R):
     if(err!=0):
         logger.error("mks_set_position: error while executing SET POSITION")
 
-    print(err)
+    #########
+    # STEP #2: monitor & wait until position is done
+    logger.info("mks_set_position: wait/veryfy position completed.")
+
+    task_args = [
+        (ip_addr_F, mks_position_F),
+        (ip_addr_L, mks_position_L),
+        (ip_addr_R, mks_position_R)
+    ]
+
+    if(err==0):
+        status = 1
+        while(status!=0) and(status!=-1):
+            time.sleep(1)
+
+            with multiprocessing.Pool(processes=3) as pool:
+                results = pool.starmap(mks_get_status, task_args)
+
+            # check result for errors
+            result_sum = 0
+            for result in results:
+                if (result==-1):
+                    logger.error("mks_set_position: error while positioning.")
+                    status=-1
+                result_sum += result
+            if(result_sum==0):
+                logger.info("mks_set_position: positioning done.")
+                status=0
+
+    # return negative on error. zero on position completed
+    rv=0
+    if(status!=0):
+        rv=-1
 
     return rv
 
