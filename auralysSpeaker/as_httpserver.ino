@@ -119,6 +119,16 @@ void httpServerLoop()
                                 cmd_ctrl = CTRL_CMD_POSITION_GET;
                                 LOG_MSGLN("GET request for get-position");
                                 displayCtrlMsgTemp((char*) "GET_POSITION", 5);
+                                rv = mksCmdRequest(CTRL_CMD_POSITION_GET, 0, 0, 0, 0);
+
+                                /* wait for immediate reply/update from the separate thread */
+                                /* we can do this because we know this is an immediate response */
+                                yield();
+                                delay(10);
+                                while( (mksMotorCmdQueue[0].status==MKS_MOTOR_STATUS_BUSY) || (mksMotorCmdQueue[0].status==MKS_MOTOR_STATUS_EXEC) )
+                                {
+                                    delay(10);
+                                }
                             }
                             else if( header.indexOf("POST /position/set") >= 0 )
                             {
@@ -128,18 +138,11 @@ void httpServerLoop()
                                 String post_param = "";
                                 char p;
 
-                                // position is 0(min)->359(max)
                                 for( int i = 0; i < req_content_length; i++ )
                                 {
                                     p = header.charAt(header.length() - req_content_length + i);
                                     post_param += p;
                                 }
-                                // p = header.charAt(header.length() - req_content_length + 1);
-                                // post_param += p;
-                                // p = header.charAt(header.length() - req_content_length + 2);
-                                // post_param += p;
-
-                                // cmd_ctrl_position = post_param.toInt();
 
                                 rv = mksCmdRequest(CTRL_CMD_POSITION_SET, post_param.toInt(), 0, 0, 0);
                             }
@@ -183,7 +186,7 @@ void httpServerLoop()
                                 reply["error"] = 0;
                                 serializeJsonPretty(reply, client);
                             }
-                            else if((CTRL_CMD_POSITION_GET == cmd_ctrl) || (CTRL_CMD_SPEED_GET == cmd_ctrl) || (CTRL_CMD_STOP == cmd_ctrl))
+                            else if( CTRL_CMD_STOP == cmd_ctrl )
                             {
                                 JsonDocument reply;
 
@@ -226,6 +229,18 @@ void httpServerLoop()
 
                                 serializeJsonPretty(reply, client);
                             }
+                            else if( CTRL_CMD_POSITION_GET == cmd_ctrl )
+                            {
+                                JsonDocument reply;
+                                reply["syntax_ver"] = "0.1";
+                                reply["error"] = rv;
+                                reply["status"] = mksMotorCmdQueue[0].status;
+                                reply["accel"]["x"] = acc_x;
+                                reply["accel"]["y"] = acc_y;
+                                reply["accel"]["z"] = acc_z;
+                                reply["encoder"] = mksMotorEncoder;
+                                serializeJsonPretty(reply, client);
+                            }
                             else if( CTRL_CMD_ZERO_SET == cmd_ctrl )
                             {
                                 JsonDocument reply;
@@ -239,7 +254,9 @@ void httpServerLoop()
                                 reply["syntax_ver"] = "0.1";
                                 reply["error"] = rv;
                                 reply["status"] = mksMotorCmdQueue[0].status;
-
+                                reply["accel"]["x"] = acc_x;
+                                reply["accel"]["y"] = acc_y;
+                                reply["accel"]["z"] = acc_z;
                                 serializeJsonPretty(reply, client);
                             }
                             else

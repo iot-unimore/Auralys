@@ -78,10 +78,10 @@
 /* Software Revision - BEGIN */
 #define SW_VER_MJR    (0) /* NOTE: 0->255, 1byte coded */
 #define SW_VER_MIN    (2) /* NOTE: 0->15,   4bit coded */
-#define SW_VER_REV    (1) /* NOTE: 0->3,    2bit coded  */
+#define SW_VER_REV    (2) /* NOTE: 0->3,    2bit coded  */
 
 /* switch define for debug/release + qa build type */
-#define DEBUG
+// #define DEBUG
 // #define QA
 
 /* SW VERSIONS for OTA : 0->3, 2 bit coded
@@ -357,9 +357,9 @@ uint32_t ledRgbColorOff = LED_RGB_OFF;
 /* ***************************************************************************** */
 /*  MKS MOTOR GLOBALS & DEFINES SECTION                                          */
 /* ***************************************************************************** */
-
-uint8_t txBuffer[64]; // send data array
-uint8_t rxBuffer[64]; // Receive data array
+#define MKS_BUFFER_SIZE (32)
+uint8_t txBuffer[MKS_BUFFER_SIZE]; // send data array
+uint8_t rxBuffer[MKS_BUFFER_SIZE]; // Receive data array
 uint8_t rxCnt = 0; // Receive data count
 
 uint8_t mksMotorSlaveAddr = 0x01;
@@ -368,6 +368,7 @@ int32_t mksMotorMax = (163840 * 10);
 int32_t mksMotorMin = (-163840 * 10);
 uint16_t mksMotorSpeed = 250;
 uint16_t mksMotorAccel = 3;
+volatile int64_t mksMotorEncoder = 0;
 bool mksMotorDirCW = true;
 
 typedef struct mksMotorCmd_ {

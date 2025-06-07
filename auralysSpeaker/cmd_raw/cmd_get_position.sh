@@ -23,8 +23,8 @@ for i in $args; do
 done
 
 if [[ $verbose -gt 0 ]]; then
-   echo "wget -qO- http://192.168.10.223/position/get ZIO"
+   echo "wget -qO- http://192.168.10.34/position/get"
    echo $verbose
 fi
 
-wget -qO- http://192.168.10.32/position/get
+wget -qO- http://192.168.10.34/position/get

@@ -19,20 +19,46 @@ void mksLoop()
         switch( mksMotorCmdQueue[0].command )
         {
             case CTRL_CMD_STOP:
-                LOG_MSGLN("GET request for STOP!");
+                LOG_MSGLN("mksLoop: CMD_STOP");
                 displayCtrlMsgTemp((char*) "STOP!", 5);
                 displayCtrlLogMsg((char*) "CMD_STOP, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_POSITION_GET:
-                LOG_MSGLN("CTRL_CMD_POSITION_GET, not supported yet");
-                displayCtrlLogMsg((char*) "CMD_POS_GET, skip");
-                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                LOG_MSGLN("mksLoop: GET_POSITION");
+                displayCtrlMsgTemp((char*) "GET_POSITION", 5);
+                displayCtrlLogMsg((char*) "GET_POS");
+
+                mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_EXEC;
+
+                ackStatus = getMksEncoderValue(mksMotorSlaveAddr);
+
+                if( ackStatus == 0 )
+                {
+                    mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_ERROR;
+                    displayCtrlLogMsg((char*) "GET_POS: Error");
+                }
+                else
+                {
+                    uint8_t* value = &rxBuffer[3];
+
+                    mksMotorEncoder = (int64_t) (
+                        ((uint64_t) value[0] << 40) |
+                        ((uint64_t) value[1] << 32) |
+                        ((uint64_t) value[2] << 24) |
+                        ((uint64_t) value[3] << 16) |
+                        ((uint64_t) value[4] << 8) |
+                        ((uint64_t) value[5] << 0)
+                        );
+
+                    mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
+                }
+
                 break;
 
             case CTRL_CMD_POSITION_SET:
-                LOG_MSGLN("CTRL_CMD_POSITION_SET, adding to queue");
+                LOG_MSGLN("mksLoop: SET_POSITION");
                 displayCtrlMsgTemp((char*) "SET_POSITION", 5);
                 displayCtrlLogMsg((char*) "SET_POS");
 
@@ -63,44 +89,44 @@ void mksLoop()
                 break;
 
             case CTRL_CMD_SPEED_GET:
-                LOG_MSGLN("CTRL_CMD_SPEED_GET, not supported yet");
+                LOG_MSGLN("mksLoop: GET_SPEED, not supported yet");
                 displayCtrlLogMsg((char*) "CMD_SPEED_GET, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_ACCEL_SET:
-                LOG_MSGLN("CTRL_CMD_ACCEL_SET, not supported yet");
+                LOG_MSGLN("mksLoop: SET_ACCEL, not supported yet");
                 displayCtrlLogMsg((char*) "CMD_ACCEL_SET, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_ACCEL_GET:
-                LOG_MSGLN("CTRL_CMD_ACCEL_GET, not supported yet");
+                LOG_MSGLN("mksLoop: GET_ACCEL, not supported yet");
                 displayCtrlLogMsg((char*) "CMD_ACCEL_GET, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_SPEED_SET:
-                LOG_MSGLN("CTRL_CMD_SPEED_SET, not supported yet")
-                displayCtrlLogMsg((char*) "CMD_SPEED_SET, skip");;
+                LOG_MSGLN("mksLoop: SET_SPEED, not supported yet");
+                displayCtrlLogMsg((char*) "CMD_SPEED_SET, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_MKS_RESET:
-                LOG_MSGLN("CTRL_CMD_MKS_RESET, not supported yet");
+                LOG_MSGLN("mksLoop: MKS_RESET, not supported yet");
                 displayCtrlLogMsg((char*) "CMD_MKS_RESET, skip");
                 /* add here other motor control operations, like stop */
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_STATUS_GET:
-                LOG_MSGLN("CTRL_CMD_STATUS_GET, not supported yet");
+                LOG_MSGLN("mksLoop: CTRL_CMD_STATUS_GET, not supported yet");
                 displayCtrlLogMsg((char*) "CMD_STATUS_GET, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             case CTRL_CMD_ZERO_SET:
-                LOG_MSGLN("CTRL_CMD_ZERO_SET");
+                LOG_MSGLN("mksLoop: CTRL_CMD_ZERO_SET");
                 displayCtrlLogMsg((char*) "CMD_ZERO_SET");
 
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_EXEC;
@@ -120,13 +146,13 @@ void mksLoop()
                 break;
 
             case CTRL_CMD_GO_ZERO:
-                LOG_MSGLN("CTRL_CMD_GO_ZERO, not supported yet");
+                LOG_MSGLN("mksLoop: CTRL_CMD_GO_ZERO, not supported yet");
                 displayCtrlLogMsg((char*) "CMD_GO_ZERO, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 break;
 
             default:
-                LOG_MSGLN("Unknown MKS command, skipped");
+                LOG_MSGLN("mksLoop: unknown MKS command, skipped");
                 displayCtrlLogMsg((char*) "CMD Unknown, skip");
                 mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
         }
@@ -187,12 +213,17 @@ uint8_t mksGetCheckSum(uint8_t* buffer, uint8_t size)
    Position mode 2 control failure 0
    timeout no reply 0
  */
-uint8_t mksWaitingForACK(uint32_t len, uint32_t delayTime)
+uint8_t mksWaitingForACK(uint32_t len, uint32_t delayTime, uint8_t retValIdx, bool retValOverride)
 {
     uint8_t retVal; // return value
     unsigned long sTime; // timing start time
     unsigned long time; // current moment
     uint8_t rxByte;
+
+    if(retValIdx >= MKS_BUFFER_SIZE)
+    {
+        return 0;
+    }
 
     sTime = millis(); // get the current moment
     rxCnt = 0; // Receive count value set to 0
@@ -215,7 +246,13 @@ uint8_t mksWaitingForACK(uint32_t len, uint32_t delayTime)
         {
             if( rxBuffer[len - 1] == mksGetCheckSum(rxBuffer, len - 1))
             {
-                retVal = rxBuffer[3]; // checksum correct
+                retVal = rxBuffer[retValIdx]; // checksum correct
+
+                if(retValOverride)
+                {
+                    retVal=1;
+                }
+
                 break; // exit while(1)
             }
             else
@@ -254,10 +291,9 @@ int8_t getMksMotorStatus(uint8_t slaveAddr)
     Serial1.write(txBuffer, 4);
 
     // Wait to start answering
-    ackStatus = mksWaitingForACK(5, 3000);
+    ackStatus = mksWaitingForACK(5, 3000, 3,false);
     if( ackStatus > 0 )
     {
-
         // Response completed
         rv = rxBuffer[3];
         if( rv == 0 )
@@ -272,29 +308,6 @@ int8_t getMksMotorStatus(uint8_t slaveAddr)
     }
 
     return rv;
-}
-
-uint64_t getMksEncoderValueCarry(uint8_t slaveAddr)
-{
-    // int i;
-    // uint16_t checkSum = 0;
-
-    // txBuffer[0] = 0xFA; // frame header
-    // txBuffer[1] = slaveAddr; // slave address
-    // txBuffer[2] = 0xF5; // function code
-    // txBuffer[3] = (speed >> 8) & 0x00FF; // 8 bit higher speed
-    // txBuffer[4] = speed & 0x00FF; // 8 bits lower
-    // txBuffer[5] = acc; // acceleration
-    // txBuffer[6] = (absAxis >> 24) & 0xFF; // Absolute coordinates bit31 - bit24
-    // txBuffer[7] = (absAxis >> 16) & 0xFF; // Absolute coordinates bit23 - bit16
-    // txBuffer[8] = (absAxis >> 8) & 0xFF; // Absolute coordinates bit15 - bit8
-    // txBuffer[9] = (absAxis >> 0) & 0xFF; // Absolute coordinates bit7 - bit0
-    // txBuffer[10] = mksGetCheckSum(txBuffer, 10); // Calculate checksum
-
-    // Serial1.write(txBuffer, 11);
-
-    return 0;
-
 }
 
 int8_t setMksMotorPosition3(uint8_t slaveAddr, uint16_t speed, uint8_t acc, int32_t absAxis)
@@ -318,14 +331,14 @@ int8_t setMksMotorPosition3(uint8_t slaveAddr, uint16_t speed, uint8_t acc, int3
     Serial1.write(txBuffer, 11);
 
     // Wait for the position control to start answering
-    ackStatus = mksWaitingForACK(5, 3000);
+    ackStatus = mksWaitingForACK(5, 3000, 3, false);
 
     if( ackStatus == 1 )
     {
         // Position control starts
 
         // Wait for the position control to complete the response
-        ackStatus = mksWaitingForACK(5, 0);
+        ackStatus = mksWaitingForACK(5, 0, 3, false);
         if( ackStatus == 2 )
         {
             // Receipt of position control complete response
@@ -388,7 +401,25 @@ int8_t mksSetAxisZero(uint8_t slaveAddr)
 
     Serial1.write(txBuffer, (i + 1));
 
-    ackStatus = mksWaitingForACK(5, 3000);
+    ackStatus = mksWaitingForACK(5, 3000, 3, false);
+
+    return ackStatus;
+}
+
+int8_t getMksEncoderValue(uint8_t slaveAddr)
+{
+    int i = 0;
+    uint16_t checkSum = 0;
+    uint8_t ackStatus;
+
+    txBuffer[i++] = 0xFA;
+    txBuffer[i++] = slaveAddr;
+    txBuffer[i++] = 0x31;
+    txBuffer[i] = mksGetCheckSum(txBuffer, i);
+    Serial1.write(txBuffer, (i + 1));
+
+    // Wait for the position control to start answering
+    ackStatus = mksWaitingForACK(10, 3000, 0, true);
 
     return ackStatus;
 }
