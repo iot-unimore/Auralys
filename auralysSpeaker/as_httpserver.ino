@@ -125,7 +125,7 @@ void httpServerLoop()
                                 /* we can do this because we know this is an immediate response */
                                 yield();
                                 delay(10);
-                                while( (mksMotorCmdQueue[0].status==MKS_MOTOR_STATUS_BUSY) || (mksMotorCmdQueue[0].status==MKS_MOTOR_STATUS_EXEC) )
+                                while((mksMotorCmdQueue[0].status == MKS_MOTOR_STATUS_BUSY) || (mksMotorCmdQueue[0].status == MKS_MOTOR_STATUS_EXEC))
                                 {
                                     delay(10);
                                 }

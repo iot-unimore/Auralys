@@ -267,7 +267,7 @@ void bspWiFiConfig(uint32_t cfgTimeout)
 
     if( cfgTimeout > 0 )
     {
-        wm.setConfigPortalTimeout(360); // auto close configportal after n seconds
+        wm.setConfigPortalTimeout(cfgTimeout); // auto close configportal after n seconds
     }
 
     wm.setCaptivePortalEnable(true); // if false, disable captive portal redirection
@@ -368,9 +368,58 @@ void bspSetup()
         bspDisplayCtrlFullscreen = false;
     }
 
+    /* no need to sleep on WiFi */
+    if( WiFi.isConnected() && (WiFi.status() == WL_CONNECTED))
+    {
+        WiFi.setSleep(false);
+    }
 
     ledRgbSetColor(ledRgbColorOff);
 
     /* DEFAULT: Start at 10Mhz for low power consumption */
     // bspSetCpuFrequencyMhz(BSP_CPU_MHZ_DEFAULT);
+}
+
+void bspLoop()
+{
+    if((!(WiFi.isConnected())) || (WiFi.status() != WL_CONNECTED))
+    {
+        LOG_MSGLN("Wifi Connection Lost");
+        displayCtrlMsg((char*) "WiFi Connect Lost");
+        displayLoop();
+
+        wifi_connected = false;
+
+        ledRgbSetColor(ledRgbColorWhite);
+
+        int i = 0;
+        while((i < BSP_RETRY_MAX) && (false == wifi_connected))
+        {
+            i++;
+            displayCtrlMsg((char*) "WiFi Connect..");
+            displayLoop();
+
+            bspEnableWiFi();
+            if( false == wifi_connected )
+            {
+                displayCtrlMsg((char*) "WiFi failed..");
+                displayLoop();
+                bspDisableWiFi();
+                delay(2000);
+            }
+        }
+
+        /* fallback on config */
+        if( false == wifi_connected )
+        {
+            ledRgbSetColor(ledRgbColorBlue);
+            bspDisplayCtrlFullscreen = true;
+            displayCtrlMsg((char*) "Config Mode..");
+            displayLoop();
+            bspWiFiConfig(120); // 2min timeout
+            bspDisplayCtrlFullscreen = false;
+        }
+
+        ledRgbSetColor(ledRgbColorOff);
+    }
 }

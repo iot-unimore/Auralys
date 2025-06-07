@@ -573,6 +573,7 @@ void motorQueueRefresh(void* param)
 /* main loop */
 void loop()
 {
+    bspLoop();
     ntpLoop();
     httpServerLoop();
 }

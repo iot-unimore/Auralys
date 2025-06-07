@@ -220,7 +220,7 @@ uint8_t mksWaitingForACK(uint32_t len, uint32_t delayTime, uint8_t retValIdx, bo
     unsigned long time; // current moment
     uint8_t rxByte;
 
-    if(retValIdx >= MKS_BUFFER_SIZE)
+    if( retValIdx >= MKS_BUFFER_SIZE )
     {
         return 0;
     }
@@ -248,9 +248,9 @@ uint8_t mksWaitingForACK(uint32_t len, uint32_t delayTime, uint8_t retValIdx, bo
             {
                 retVal = rxBuffer[retValIdx]; // checksum correct
 
-                if(retValOverride)
+                if( retValOverride )
                 {
-                    retVal=1;
+                    retVal = 1;
                 }
 
                 break; // exit while(1)
@@ -291,7 +291,7 @@ int8_t getMksMotorStatus(uint8_t slaveAddr)
     Serial1.write(txBuffer, 4);
 
     // Wait to start answering
-    ackStatus = mksWaitingForACK(5, 3000, 3,false);
+    ackStatus = mksWaitingForACK(5, 3000, 3, false);
     if( ackStatus > 0 )
     {
         // Response completed
