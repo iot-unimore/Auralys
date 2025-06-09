@@ -77,8 +77,8 @@
 
 /* Software Revision - BEGIN */
 #define SW_VER_MJR    (0) /* NOTE: 0->255, 1byte coded */
-#define SW_VER_MIN    (2) /* NOTE: 0->15,   4bit coded */
-#define SW_VER_REV    (3) /* NOTE: 0->3,    2bit coded  */
+#define SW_VER_MIN    (3) /* NOTE: 0->15,   4bit coded */
+#define SW_VER_REV    (1) /* NOTE: 0->3,    2bit coded  */
 
 /* switch define for debug/release + qa build type */
 #define DEBUG
@@ -516,7 +516,7 @@ void setup()
     httpServerSetup();
 
     /* motion sensor */
-    ///////   motionSetup();
+    motionSetup();
 
     // bspI2CScan();
 
@@ -555,7 +555,7 @@ void displayRefresh(void* param)
     /* needs to be encapsulated in a while(1) loop */
     while( 1 )
     {
-        ///////motionLoop();
+        motionLoop();
         displayLoop();
         yield();
         delay(300);
