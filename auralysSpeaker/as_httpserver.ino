@@ -2,6 +2,19 @@
 /* Webserver Control Functions                                                */
 /* ************************************************************************** */
 
+String httpParamDecode(String header, int16_t req_content_length)
+{
+    String post_param = "";
+    char p;
+
+    for( int i = 0; i < req_content_length; i++ )
+    {
+        p = header.charAt(header.length() - req_content_length + i);
+        post_param += p;
+    }
+    return post_param;
+}
+
 void httpServerSetup()
 {
     if( WiFi.isConnected() && (WiFi.status() == WL_CONNECTED))
@@ -104,15 +117,52 @@ void httpServerLoop()
                                 cmd_ctrl = CTRL_CMD_STOP;
                                 // getMksMotorStatus(mksMotorSlaveAddr);
                             }
-                            if((header.indexOf("GET /ctrl/reset") >= 0) || (header.indexOf("POST /ctrl/reset") >= 0))
+                            else if((header.indexOf("GET /ctrl/reset") >= 0) || (header.indexOf("POST /ctrl/reset") >= 0))
                             {
                                 LOG_MSGLN("Got request for system RESET");
                                 cmd_ctrl = CTRL_CMD_RESET;
                             }
-                            if((header.indexOf("GET /ctrl/reboot") >= 0) || (header.indexOf("POST /ctrl/reboot") >= 0))
+                            else if((header.indexOf("GET /ctrl/reboot") >= 0) || (header.indexOf("POST /ctrl/reboot") >= 0))
                             {
                                 LOG_MSGLN("Got request for system REBOOT");
                                 cmd_ctrl = CTRL_CMD_REBOOT;
+                            }
+                            else if((header.indexOf("POST /ctrl/unit_type/set") >= 0))
+                            {
+                                char sbuf[64];
+                                uint8_t tmp8 = ((httpParamDecode(header, req_content_length).toInt()) & 0xFF);
+                                LOG_MSGLN("Got request for UNIT_TYPE SET");
+                                sprintf(sbuf, "SET UNIT TYPE: %c", DISPLAY_HW_UNIT_TYPE[tmp8]);
+                                displayCtrlLogMsg(sbuf);
+
+                                cmd_ctrl = CTRL_CMD_UNIT_TYPE_SET;
+                                eepromUpdateByte(EE_HW_UNIT_TYPE_OFFS, tmp8);
+                                eepromCommit();
+                                eepromGetConfigs();
+                            }
+                            else if((header.indexOf("POST /ctrl/speed/set") >= 0))
+                            {
+                                char sbuf[64];
+                                uint8_t tmp8 = ((httpParamDecode(header, req_content_length).toInt()) & 0xFF);
+                                LOG_MSGLN("Got request for SPEED SET");
+                                sprintf(sbuf, "SET SPEED: %3d", tmp8);
+                                displayCtrlLogMsg(sbuf);
+                                cmd_ctrl = CTRL_CMD_SPEED_SET;
+                                eepromUpdateByte(EE_HW_MKS_SPEED_OFFS, ((httpParamDecode(header, req_content_length).toInt()) & 0xFF));
+                                eepromCommit();
+                                eepromGetConfigs();
+                            }
+                            else if((header.indexOf("POST /ctrl/accel/set") >= 0))
+                            {
+                                char sbuf[64];
+                                uint8_t tmp8 = ((httpParamDecode(header, req_content_length).toInt()) & 0xFF);
+                                sprintf(sbuf, "SET ACCEL: %3d", tmp8);
+                                displayCtrlLogMsg(sbuf);
+                                LOG_MSGLN("Got request for ACCEL SET");
+                                cmd_ctrl = CTRL_CMD_ACCEL_SET;
+                                eepromUpdateByte(EE_HW_MKS_ACCEL_OFFS, ((httpParamDecode(header, req_content_length).toInt()) & 0xFF));
+                                eepromCommit();
+                                eepromGetConfigs();
                             }
                             else if( header.indexOf("GET /position/get") >= 0 )
                             {
@@ -204,6 +254,31 @@ void httpServerLoop()
                                 // reply[ "motion_direction" ] = ( motion_status_ctrl & 0x02 ) >> 1;
                                 // reply[ "motion_speed" ] = motion_speed; // motion_compute_speed (position, position_begin, position_end);
 
+                                serializeJsonPretty(reply, client);
+                            }
+                            else if( CTRL_CMD_UNIT_TYPE_SET == cmd_ctrl )
+                            {
+                                JsonDocument reply;
+                                reply["syntax_ver"] = "0.1";
+                                reply["error"] = 0;
+                                reply["id"] = "CTRL_CMD_UNIT_TYPE_SET";
+
+                                serializeJsonPretty(reply, client);
+                            }
+                            else if( CTRL_CMD_ACCEL_SET == cmd_ctrl )
+                            {
+                                JsonDocument reply;
+                                reply["syntax_ver"] = "0.1";
+                                reply["error"] = 0;
+                                reply["id"] = "CTRL_CMD_ACCEL_SET";
+                                serializeJsonPretty(reply, client);
+                            }
+                            else if( CTRL_CMD_SPEED_SET == cmd_ctrl )
+                            {
+                                JsonDocument reply;
+                                reply["syntax_ver"] = "0.1";
+                                reply["error"] = 0;
+                                reply["id"] = "CTRL_CMD_SPEED_SET";
                                 serializeJsonPretty(reply, client);
                             }
                             else if( CTRL_CMD_POSITION_SET == cmd_ctrl )

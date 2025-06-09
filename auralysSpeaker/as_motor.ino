@@ -6,8 +6,14 @@ void mksSetup()
 {
     Serial1.begin(UART_MKS_BAUD, SERIAL_8N1, UART_MKS_RX_PIN, UART_MKS_TX_PIN);
 
+    /* Read setup from eeprom -> hw_config */
+    mksMotorSpeed = hw_config.hw_mks_speed;
+    mksMotorAccel = hw_config.hw_mks_accel;
+
     /* TODO: set motor mode here, depending on the role of the unit */
     /*       closed loop for speaker, serial_vfoc for poles */
+
+
 }
 
 void mksLoop()

@@ -7,7 +7,6 @@
  *  ============================== ESP32 INTERNAL EEPROM =======================
  */
 
-
 inline void eepromReadBytes(byte* dst, uint16_t src, uint16_t src_size)
 {
     uint16_t i = 0;
@@ -108,15 +107,20 @@ void eepromSetup()
         {
             device_hostname[15 - i] = hw_config.hw_pcb_uuid4[31 - i];
         }
+
+        eepromGetConfigs();
     }
 }
 
-void eepromGetDefaults()
+void eepromGetConfigs()
 {
-    /* empty */
+    /* read hw section */
+    eepromReadBytes(&hw_config.hw_unit_type, EE_HW_UNIT_TYPE_OFFS, EE_HW_UNIT_TYPE_SIZE);
+    eepromReadBytes(&hw_config.hw_mks_speed, EE_HW_MKS_SPEED_OFFS, EE_HW_MKS_SPEED_SIZE);
+    eepromReadBytes(&hw_config.hw_mks_accel, EE_HW_MKS_ACCEL_OFFS, EE_HW_MKS_ACCEL_SIZE);
 }
 
-void eepromSetDefaults()
+void eepromSetConfigs()
 {
     /* empty */
 }

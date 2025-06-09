@@ -9,7 +9,7 @@
     "minR": -600000.0,
     "hF_mm": 2600.0,
     "dF_mm": 1540.0,
-    "maxF": 600000.0,
+    "maxF": 700000.0,
     "minF": -600000.0,
-    "coord_type": "as"
+    "coord_type": "ac"
 }

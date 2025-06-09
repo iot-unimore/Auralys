@@ -6,6 +6,8 @@
 
 void displaySetup()
 {
+    char sbuf[64];
+
     display.begin(SCREEN_I2C_ADDR, true);
     // display.setContrast (0); // dim display
 
@@ -15,6 +17,12 @@ void displaySetup()
 
     display.clearDisplay();
     display.display();
+
+    /* show mks config */
+    sprintf(sbuf, "SPEED: %d", hw_config.hw_mks_speed);
+    displayCtrlLogMsg(sbuf);
+    sprintf(sbuf, "ACCEL: %d", hw_config.hw_mks_accel);
+    displayCtrlLogMsg(sbuf);
 }
 
 void displayLoop()
@@ -52,13 +60,21 @@ void displayLoop()
             if( !getLocalTime(&timeinfo))
             {
                 LOG_MSGLN("[DISPLAY][NTP][ERROR] Failed to obtain time");
+
+                sprintf(sbuf, "00-00-0000 %c 00:00:00", DISPLAY_HW_UNIT_TYPE[hw_config.hw_unit_type]);
+
+                display.setCursor(0, 0);
+                display.setTextSize(1);
+                display.setTextColor(SH110X_WHITE);
+                display.print(sbuf);
             }
             else
             {
-                sprintf(sbuf, "%04d-%02d-%02d   %02d:%02d:%02d",
+                sprintf(sbuf, "%04d-%02d-%02d %c %02d:%02d:%02d",
                         timeinfo.tm_year + 1900,
                         timeinfo.tm_mon,
                         timeinfo.tm_mday,
+                        DISPLAY_HW_UNIT_TYPE[hw_config.hw_unit_type],
                         timeinfo.tm_hour,
                         timeinfo.tm_min,
                         timeinfo.tm_sec
@@ -67,10 +83,7 @@ void displayLoop()
                 display.setCursor(0, 0);
                 display.setTextSize(1);
                 display.setTextColor(SH110X_WHITE);
-                // display.setTextColor(SH110X_BLACK, SH110X_WHITE); // 'inverted' text
                 display.print(sbuf);
-
-                // Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
             }
 
 
@@ -166,13 +179,6 @@ void displaySplashScreen()
     display.setTextColor(SH110X_WHITE);
     sprintf(sbuf, "2025 - ver.%1d.%1d.%1d.%s", SW_VER_MJR, SW_VER_MIN, SW_VER_REV, sbuild);
     display.print(sbuf);
-
-    // display.setTextColor(SH110X_BLACK, SH110X_WHITE); // 'inverted' text
-    // display.println(3.141592);
-
-    // display.setTextSize(2);
-    // display.setTextColor(SH110X_WHITE);
-    // display.print("0x"); display.println(0xDEADBEEF, HEX);
 
     display.display();
 }

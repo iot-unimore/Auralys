@@ -30,9 +30,11 @@ typedef struct _hw_config {
     char hw_pcb_uuid4[32 + 1];
     uint8_t hw_unit_type;
     uint8_t hw_unit_orientation;
-
-    /* TOTAL STRUCT SIZE = 13 of 256 */
+    uint8_t hw_mks_slave_addr;
+    uint8_t hw_mks_speed;
+    uint8_t hw_mks_accel;
 }HW_PCB_CONFIG_T;
+
 
 #endif
 /* EOF */
@@ -44,9 +46,11 @@ DETAILS:
 ===============================================================
 */
 
-#define HW_UNIT_TYPE_CENTER                  (0)
+#define HW_UNIT_TYPE_NONE                    (0)
 #define HW_UNIT_TYPE_LEFT                    (1)
 #define HW_UNIT_TYPE_RIGHT                   (2)
+#define HW_UNIT_TYPE_FRONT                   (3)
+#define HW_UNIT_TYPE_SPEAKER                 (4)
 
 #define HW_UNIT_ORIENTATION_VERTICAL_UP      (0)
 #define HW_UNIT_ORIENTATION_VERTICAL_DW      (1)

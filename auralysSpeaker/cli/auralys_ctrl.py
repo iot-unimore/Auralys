@@ -56,14 +56,14 @@ mks_R_step_mm = float(1000000.0 / 1600.0)
 # front stand position and size
 hF_mm = 2600.0
 dF_mm = 1540.0
-maxF = 600000.0
+maxF = 700000.0
 minF = -600000.0
 mks_F_step_mm = float(1000000.0 / 1505.0)
 
 # origin (zero point) for MKS steppers
-mks_origin_x_mm = 700.0
+mks_origin_x_mm = 650.0
 mks_origin_y_mm = 0.0
-mks_origin_z_mm = 1520.0
+mks_origin_z_mm = 1470.0
 
 # origin (zero point) for head centroid
 head_origin_x_mm = 0

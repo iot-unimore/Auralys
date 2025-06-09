@@ -78,7 +78,7 @@
 /* Software Revision - BEGIN */
 #define SW_VER_MJR    (0) /* NOTE: 0->255, 1byte coded */
 #define SW_VER_MIN    (2) /* NOTE: 0->15,   4bit coded */
-#define SW_VER_REV    (2) /* NOTE: 0->3,    2bit coded  */
+#define SW_VER_REV    (3) /* NOTE: 0->3,    2bit coded  */
 
 /* switch define for debug/release + qa build type */
 #define DEBUG
@@ -143,7 +143,7 @@ char device_hostname[16 + 1] = "auspkr-000000000";
 /* default/empty hw configuration (read from nfctag at boot) */
 HW_PCB_CONFIG_T hw_config = {
     0, /* hw_section_size */
-    0, /* hw_descriptor_mjr */
+    1, /* hw_descriptor_mjr */
     0, /* hw_descriptor_min */
     "unknown", /* hw_codename */
     "unknown", /* hw_cpu_arch */
@@ -153,7 +153,9 @@ HW_PCB_CONFIG_T hw_config = {
     "01234567890123456789012345678901", /* hw_pcb_uuid4 */
     0, /* hw_unit_type */
     0, /* hw_unit_orientation */
-
+    1, /* hw_mks_slave_addr */
+    10, /* hw_mks_speed */
+    1 /* hw_mks_accel */
 };
 
 /* ============================================================================= */
@@ -181,6 +183,8 @@ HW_PCB_CONFIG_T hw_config = {
 #define SCREEN_WIDTH     (128)
 #define SCREEN_HEIGHT     (64)
 #define OLED_RESET        (-1)
+
+const char DISPLAY_HW_UNIT_TYPE[] = { 'N', 'L', 'R', 'F', 'S' };
 
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #endif
@@ -279,21 +283,23 @@ WiFiClient client;
 String header;
 
 // web command defines
-#define CTRL_CMD_NONE         (0)
-#define CTRL_CMD_STOP         (1)
-#define CTRL_CMD_POSITION_GET (2)
-#define CTRL_CMD_POSITION_SET (3)
-#define CTRL_CMD_SPEED_GET    (4)
-#define CTRL_CMD_SPEED_SET    (5)
-#define CTRL_CMD_ACCEL_GET    (6)
-#define CTRL_CMD_ACCEL_SET    (7)
-#define CTRL_CMD_RESET        (8)
-#define CTRL_CMD_REBOOT       (9)
-#define CTRL_CMD_MKS_RESET    (10)
-#define CTRL_CMD_STATUS_GET   (11)
-#define CTRL_CMD_ZERO_SET     (12)
-#define CTRL_CMD_GO_ZERO      (13)
-#define CTRL_CMD_MINMAX_SET   (14)
+#define CTRL_CMD_NONE            (0)
+#define CTRL_CMD_STOP            (1)
+#define CTRL_CMD_POSITION_GET    (2)
+#define CTRL_CMD_POSITION_SET    (3)
+#define CTRL_CMD_SPEED_GET       (4)
+#define CTRL_CMD_SPEED_SET       (5)
+#define CTRL_CMD_ACCEL_GET       (6)
+#define CTRL_CMD_ACCEL_SET       (7)
+#define CTRL_CMD_RESET           (8)
+#define CTRL_CMD_REBOOT          (9)
+#define CTRL_CMD_MKS_RESET      (10)
+#define CTRL_CMD_STATUS_GET     (11)
+#define CTRL_CMD_ZERO_SET       (12)
+#define CTRL_CMD_GO_ZERO        (13)
+#define CTRL_CMD_MINMAX_SET     (14)
+#define CTRL_CMD_UNIT_TYPE_SET  (15)
+
 
 /* ============================================================================= */
 /* NTP Time GLOBALS&DEFINES SECTION                                               */
@@ -386,6 +392,7 @@ mksMotorCmd_t mksMotorCmdQueue[1] = { 0 };
 #define MKS_MOTOR_STATUS_IDLE     (0)
 #define MKS_MOTOR_STATUS_BUSY     (1)
 #define MKS_MOTOR_STATUS_EXEC     (2)
+
 
 
 /* ============================================================================= */
@@ -509,7 +516,7 @@ void setup()
     httpServerSetup();
 
     /* motion sensor */
-    motionSetup();
+    ///////   motionSetup();
 
     // bspI2CScan();
 
@@ -548,7 +555,7 @@ void displayRefresh(void* param)
     /* needs to be encapsulated in a while(1) loop */
     while( 1 )
     {
-        motionLoop();
+        ///////motionLoop();
         displayLoop();
         yield();
         delay(300);

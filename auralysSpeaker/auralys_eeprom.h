@@ -34,10 +34,17 @@
 #define EE_SYS_INIT_MONTH_SIZE                                                             (1)
 #define EE_SYS_INIT_DAY_OFFS                 (EE_SYS_INIT_MONTH_OFFS + EE_SYS_INIT_MONTH_SIZE)
 #define EE_SYS_INIT_DAY_SIZE                                                               (1)
-#define EE_SYS_INIT_USR_TEMP_MAX_OFFS        (EE_SYS_INIT_DAY_OFFS + EE_SYS_INIT_ACCEL_Z_SIZE)
-#define EE_SYS_INIT_USR_TEMP_MAX_SIZE                                                      (1) //25 bytes used
+#define EE_HW_UNIT_TYPE_OFFS                     (EE_SYS_INIT_DAY_OFFS + EE_SYS_INIT_DAY_SIZE)
+#define EE_HW_UNIT_TYPE_SIZE                                                               (1)
+#define EE_HW_MKS_SLAVE_ADDR_OFFS                (EE_HW_UNIT_TYPE_OFFS + EE_HW_UNIT_TYPE_SIZE)
+#define EE_HW_MKS_SLAVE_ADDR_SIZE                                                          (1)
+#define EE_HW_MKS_SPEED_OFFS           (EE_HW_MKS_SLAVE_ADDR_OFFS + EE_HW_MKS_SLAVE_ADDR_SIZE)
+#define EE_HW_MKS_SPEED_SIZE                                                               (1)
+#define EE_HW_MKS_ACCEL_OFFS                     (EE_HW_MKS_SPEED_OFFS + EE_HW_MKS_SPEED_SIZE)
+#define EE_HW_MKS_ACCEL_SIZE                                                               (1)
+
 /* IMPORTANT: (EE_SYS_ADDR_END - EE_SYS_ADDR) < EE_SECTION_SYSTEM_SIZE, do not overflow     */
-#define EE_SYS_ADDR_END        (EE_SYS_INIT_USR_TEMP_MAX_OFFS + EE_SYS_INIT_USR_TEMP_MAX_SIZE)
+#define EE_SYS_ADDR_END                          (EE_HW_MKS_ACCEL_OFFS + EE_HW_MKS_ACCEL_SIZE)
 /* */
 
 
@@ -46,8 +53,10 @@
 #define EE_SYS_CFG_ORIENTATION_LSB_MSK                                                            (1<<1)
 #define EE_SYS_CFG_ORIENTATION_MSK       (EE_SYS_CFG_ORIENTATION_MSB_MSK|EE_SYS_CFG_ORIENTATION_LSB_MSK)
 #define EE_SYS_CFG_WIFI_ENABLE_MSK                                                                (1<<2)
-#define EE_SYS_CFG_NBIOT_ENABLE_MSK                                                               (1<<3)
+#define EE_SYS_CFG_NTP_ENABLE_MSK                                                                 (1<<3)
 #define EE_SYS_CFG_GPS_ENABLE_MSK                                                                 (1<<4)
+#define EE_SYS_CFG_NBIOT_ENABLE_MSK                                                               (1<<5)
+#define EE_SYS_CFG_LORAWAN_ENABLE_MSK                                                             (1<<6)
 
 /* BIT-MASKS for INIT fields */
 #define EE_SYS_INIT_BSPINITIALIZED_MSK                                                            (1<<0)
