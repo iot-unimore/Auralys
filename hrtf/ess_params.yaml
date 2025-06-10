@@ -1,0 +1,535 @@
+---
+# Sine Sweep Recording configuration file
+# 
+# The sintax of this configuration file is hevily derived
+# from the AES69-2022 definitions for SimpleFreeFieldHRIR/HRTF
+# use cases. In particular only one-source/many-emitters and
+# one-listener/many-receivers are allowed.
+# Source and Listener have absolute coordinates with reference
+# to the Room (global coordinated) while emitters and receivers
+# have local coordinates (reference to the object itself)
+
+# ess_config.yaml syntax specification versioning
+syntax:
+  name: audio_measure
+  version:
+    major: 0
+    minor: 2
+    revision: 0
+
+custom:
+  project_folder: test
+  audio_folder: test
+  audio_filename: sweep_0
+  stimulus:
+    type: ess_sweep
+    sweep:
+      track_id: 2
+      repeat:
+        value: 1
+      frequency:
+        begin: 20
+        end: 20000
+        units: hertz
+      amplitude:
+        value: 0.8
+        max: 1.0
+        min: 0.0
+      duration:
+        value: 15
+        units: s
+      padding:
+        pre:
+          value: 2
+          beep: 0
+          units: s
+        post:
+          value: 2
+          beep: 0
+          units: s
+  recording:
+    samplerate: 96000
+    units: hertz
+    format: wav
+    subformat: PCM_24
+    bit_depth: s24be
+
+#
+# general section derived from AES69-2022
+#
+general:
+  title: Auralys Project
+  application_name: Auralys Project SOFA
+  application_version: 0.0
+  database_name: none
+  date_created: 2024-01-01
+  date_modified: 2024-01-01
+  author:
+    firstname: gianluca
+    lastname: filippini
+    mail: gianluca.filippini@unimore.it
+  organization: unimore.it
+  references: none
+  origin: none
+  license: CC-BY-4.0
+  comment: https://creativecommons.org/licenses/by/4.0/
+  history: none
+
+
+# audio setup descriptions
+# coordinates: see https://pyfar.readthedocs.io/en/stable/classes/pyfar.coordinates.html
+# origin (0,0,0) head of the person (cartesian 0,0,0)
+# tx: source (emitters: audio speakers)
+# rx: head (receivers: microphones)
+#
+
+#
+# room env specification
+#
+room:
+  type: free field
+  short_name: none
+  description: none
+  location: Italy
+  temperature:
+    value: 298.15
+    units: kelvin
+  geometry: none
+  volume:
+    value: 200
+    units: ['cubic metre']
+  corners:
+    numcorners: 2
+    A:
+      coord:
+        value: [3, 3, 0]
+        type: cartesian
+        units: ['metre']
+    B:
+      coord:
+        value: [-3, -3, 3]
+        type: cartesian
+        units: ['metre']
+  calibration:
+    noise_floor:
+       value: 45.0
+       type: dbA,slow
+       units: ['db']
+
+#
+# audio setup and wav track description
+#
+setup:
+  #
+  # sources & emitters
+  #
+  sources_count: 1
+  sources:
+    0:
+      short_name: wilson_spkr
+      description: none
+      position:
+        coord:
+          value: [0, 0, 1]
+          type: spherical
+          units: ['degree','degree','metre']
+        view_vect:
+          value: [1, 0, 0]
+          type: cartesian
+          units: ['metre']
+        up_vect:
+          value: [0, 0, 1]
+      position_copy:
+        coord:
+          value: [0, 0, 1]
+          type: spherical
+          units: ['degree','degree','metre']
+      emitters_count: 1
+      emitters:
+        0:
+          short_name: wilson_spkr_v1
+          description: spherical speaker with equalization
+          track_id: 2
+          signal_type: ess_sweep
+          device_type: speaker
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 70.0
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60.0
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 70.5
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [0, 0, 0]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [1, 0, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+  #
+  # listeners & receivers
+  #
+  listeners_count: 1
+  listeners:
+    0:
+      short_name: wilson_head
+      description: https://www.thingiverse.com/thing:4691843
+      position:
+        coord:
+          value: [0, 0, 0]
+          type: cartesian
+          units: ['metre']
+        view_vect:
+          value: [1, 0, 0]
+          type: cartesian
+          units: ['metre']
+        up_vect:
+          value: [0, 0, 1]
+      receivers_count: 12
+      receivers:
+        0:
+          short_name: ambisonic
+          description: LFU
+          note: rode nt-sf1
+          track_id: 8
+          signal_type: mic
+          device_type: analog
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [0, 0, 0.16]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [1, 0, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+        1:
+          short_name: ambisonic
+          description: LBD
+          note: rode nt-sf1
+          track_id: 9
+          signal_type: mic
+          device_type: analog
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [0, 0, 0.16]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [1, 0, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+        2:
+          short_name: ambisonic
+          description: RFD
+          note: rode nt-sf1
+          track_id: 10
+          signal_type: mic
+          device_type: analog
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [0, 0, 0.16]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [1, 0, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+        3:
+          short_name: ambisonic
+          description: RBU
+          note: rode nt-sf1
+          track_id: 11
+          signal_type: mic
+          device_type: analog
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [0, 0, 0.16]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [1, 0, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+        4:
+          short_name: binaural
+          description: left
+          note:
+          track_id: 14
+          signal_type: mems
+          device_type: analog
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [0, 0.065, 0]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [0, 1, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+        5:
+          short_name: binaural
+          description: right
+          note: mems mic
+          track_id: 15
+          signal_type: mic_record
+          device_type: analog_mems
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [0, -0.065, 0]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [0, -1, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+        6:
+          short_name: array_six
+          description: left_front
+          note: mems mic KNOWLES_SPM0687LR5H-1
+          track_id: 16
+          signal_type: mems
+          device_type: analog_mems
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [0.10, 0.08, 0.03]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [1, 0, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+        7:
+          short_name: array_six
+          description: left_middle
+          note: mems mic KNOWLES_SPM0687LR5H-1
+          track_id: 17
+          signal_type: mems
+          device_type: analog_mems
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [0.05, 0.08, 0.035]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [0, 1, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+        8:
+          short_name: array_six
+          description: left_rear
+          note: mems mic KNOWLES_SPM0687LR5H-1
+          track_id: 18
+          signal_type: mems
+          device_type: analog_mems
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [-0.03, 0.08, 0.015]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [0, 1, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+        9:
+          short_name: array_six
+          description: right_front
+          note: mems mic KNOWLES_SPM0687LR5H-1
+          track_id: 19
+          signal_type: mems
+          device_type: analog_mems
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [0.10, -0.08, 0.030]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [1, 0, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+        10:
+          short_name: array_six
+          description: right_middle
+          note: mems mic KNOWLES_SPM0687LR5H-1
+          track_id: 20
+          signal_type: mems
+          device_type: analog_mems
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [0.05, -0.08, 0.035]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [0, -1, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+        11:
+          short_name: array_six
+          description: right_rear
+          note: mems mic KNOWLES_SPM0687LR5H-1
+          track_id: 21
+          signal_type: mems
+          device_type: analog_mems
+          calibration:
+            whitenoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            pinknoise:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+            sine-1khz:
+              spl_1m_dbA_slow: 60
+              wav_peak_level: 0.8
+          position:
+            coord:
+              value: [-0.03, -0.08, 0.015]
+              type: cartesian
+              units: ['metre']
+            view_vect:
+              value: [0, -1, 0]
+              type: cartesian
+              units: ['metre']
+            up_vect:
+              value: [0, 0, 1]
+
+#EOF
+...
