@@ -61,12 +61,12 @@ minF = -800000.0
 mks_F_step_mm = float(1000000.0 / 1505.0)
 
 # cartesian coord min/max
-min_x_cartesian = 500
-max_x_cartesian = 1500
-min_y_cartesian = -1000
-max_y_cartesian = 1000
+min_x_cartesian = 400
+max_x_cartesian = dF_mm - 100
+min_y_cartesian = dR_mm - 100
+max_y_cartesian = dL_mm - 100
 min_z_cartesian = 400
-max_z_cartesian = min(hL_mm,hR_mm,hF_mm)-100
+max_z_cartesian = min(hL_mm,hR_mm,hF_mm) - 100
 
 # origin (zero point) for MKS steppers
 mks_origin_x_mm = 1000.0
