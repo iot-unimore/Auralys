@@ -43,27 +43,35 @@ logger = logging.getLogger(__name__)
 hL_mm = 2600.0
 dL_mm = 550.0
 maxL = 600000.0
-minL = -600000.0
-mks_L_step_mm = float(1000000.0 / 1480.0)
+minL = -700000.0
+mks_L_step_mm = float(1000000.0 / 1570.0)
 
 # right stand position and size
 hR_mm = 2600.0
 dR_mm = 550.0
 maxR = 600000.0
-minR = -600000.0
+minR = -700000.0
 mks_R_step_mm = float(1000000.0 / 1600.0)
 
 # front stand position and size
 hF_mm = 2600.0
 dF_mm = 1540.0
 maxF = 700000.0
-minF = -600000.0
+minF = -800000.0
 mks_F_step_mm = float(1000000.0 / 1505.0)
 
+# cartesian coord min/max
+min_x_cartesian = 500
+max_x_cartesian = 1500
+min_y_cartesian = -1000
+max_y_cartesian = 1000
+min_z_cartesian = 400
+max_z_cartesian = min(hL_mm,hR_mm,hF_mm)-100
+
 # origin (zero point) for MKS steppers
-mks_origin_x_mm = 650.0
+mks_origin_x_mm = 1000.0
 mks_origin_y_mm = 0.0
-mks_origin_z_mm = 1470.0
+mks_origin_z_mm = 1700.0
 
 # origin (zero point) for head centroid
 head_origin_x_mm = 0
@@ -137,6 +145,13 @@ def verify_coord_limits(x, y, z):
     angleL_ref = math.atan(dF_mm / dL_mm)
     if (angleR_ref < math.atan(x / (dR_mm + y))) or (angleL_ref < math.atan(x / (dL_mm - y))):
         logger.error("Coordinate outside of boundaries")
+        return -1
+
+    return 0
+
+
+def verify_coord_cartesian_limits(x, y, z):
+    if ( (x>max_x_cartesian) or (x<min_x_cartesian) or (z>max_z_cartesian) or (z<min_z_cartesian) or (y>max_y_cartesian) or (y<min_y_cartesian)):
         return -1
 
     return 0
@@ -249,9 +264,14 @@ def set_position(x, y, z, type):
     # COORD TYPE: absolute cartesian
     if "ac" == type:
         # SANITY CHECK
-        if 0 != verify_coord_limits(x, y, z):
+        if (0 != verify_coord_limits(x, y, z)):
             logger.error("coordinates verification failed.")
             return -1
+
+        if (0 != verify_coord_cartesian_limits(x,y,x)):
+            logger.error("coordinates verification failed.")
+            return -1
+
 
         [mks_originL, mks_originR, mks_originF] = compute_wires_length(
             float(mks_origin_x_mm), float(mks_origin_y_mm), float(mks_origin_z_mm)
