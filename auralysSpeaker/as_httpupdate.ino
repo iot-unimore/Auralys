@@ -106,18 +106,32 @@ void performUpdate(Stream &updateSource, size_t updateSize)
 void http_update_started()
 {
     LOG_MSGLN("CALLBACK:  HTTP update process started");
+
+    displayCtrlMsg((char*) "FW Update Begin.");
+    displayLoop();
+
     ledRgbSetColor(ledRgbColorViolet);
 }
 
 void http_update_finished()
 {
     LOG_MSGLN("CALLBACK:  HTTP update process finished");
+
+    displayCtrlMsg((char*) "FW Update Done.");
+    displayLoop();
+
     ledRgbSetColor(ledRgbColorOff);
 }
 
 void http_update_progress(int cur, int total)
 {
+    char sbuf[64];
+
     LOG_PRINTF("CALLBACK:  HTTP update process at %d of %d bytes...\n", cur, total);
+
+    sprintf(sbuf, "Update %d of %d", cur, total);
+    displayCtrlMsg(sbuf);
+    displayLoop();
 
     if( ledRgbColorViolet == ledRgbGetColor())
     {
@@ -195,10 +209,6 @@ int8_t httpWiFiUpdate()
             ret = httpUpdate.update(gsmClient, HTTPUPDATE_RD_SERVER, 80, "/brws_iot/update/", SwVer);
 #else
             LOG_MSGLN("[HTTP-UPDATE][WiFi] PRODUCTION-SERVER : connecting....");
-
-            // ToDo: IMPORTANT: uncomment this one once we switch production server to brainworks.it !!
-            // t_httpUpdate_return ret = httpUpdate.update(gsmClient, HTTPUPDATE_PRODUCTION_SERVER, 80, "/iot/update/", SwVer);
-
             t_httpUpdate_return ret = httpUpdate.update(gsmClient, HTTPUPDATE_PRODUCTION_SERVER, 80, "/brws_iot/update/", SwVer);
 #endif
 
