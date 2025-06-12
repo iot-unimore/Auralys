@@ -2,6 +2,34 @@
 /* MKS MOTOR CONTROL                                                             */
 /* ============================================================================= */
 
+int64_t read_signed_48bit(const uint8_t* data)
+{
+
+    // mksMotorEncoder = (int64_t) (
+    // ((uint64_t) value[0] << 40) |
+    // ((uint64_t) value[1] << 32) |
+    // ((uint64_t) value[2] << 24) |
+    // ((uint64_t) value[3] << 16) |
+    // ((uint64_t) value[4] << 8) |
+    // ((uint64_t) value[5] << 0)
+    // );
+
+    uint64_t value = ((uint64_t) data[0] << 40) |
+                     ((uint64_t) data[1] << 32) |
+                     ((uint64_t) data[2] << 24) |
+                     ((uint64_t) data[3] << 16) |
+                     ((uint64_t) data[4] << 8) |
+                     ((uint64_t) data[5] << 0);
+
+    // Check the sign bit (bit 47) and sign-extend manually
+    if( value & (1ULL << 47))
+    {
+        value |= 0xFFFF000000000000ULL; // Set upper 16 bits to 1
+    }
+
+    return (int64_t) value;
+}
+
 void mksSetup()
 {
     Serial1.begin(UART_MKS_BAUD, SERIAL_8N1, UART_MKS_RX_PIN, UART_MKS_TX_PIN);
@@ -47,16 +75,9 @@ void mksLoop()
                 }
                 else
                 {
-                    uint8_t* value = &rxBuffer[3];
+                    const uint8_t* value = &rxBuffer[3];
 
-                    mksMotorEncoder = (int64_t) (
-                        ((uint64_t) value[0] << 40) |
-                        ((uint64_t) value[1] << 32) |
-                        ((uint64_t) value[2] << 24) |
-                        ((uint64_t) value[3] << 16) |
-                        ((uint64_t) value[4] << 8) |
-                        ((uint64_t) value[5] << 0)
-                        );
+                    mksMotorEncoder = read_signed_48bit(value);
 
                     mksMotorCmdQueue[0].status = MKS_MOTOR_STATUS_IDLE;
                 }
