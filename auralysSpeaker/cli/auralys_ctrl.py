@@ -63,15 +63,15 @@ mks_F_step_mm = float(1000000.0 / 1505.0)
 # cartesian coord min/max
 min_x_cartesian = 400
 max_x_cartesian = dF_mm - 100
-min_y_cartesian = dR_mm - 100
+min_y_cartesian = -(dR_mm - 100)
 max_y_cartesian = dL_mm - 100
 min_z_cartesian = 400
 max_z_cartesian = min(hL_mm,hR_mm,hF_mm) - 100
 
 # origin (zero point) for MKS steppers
-mks_origin_x_mm = 1000.0
+mks_origin_x_mm = 800.0
 mks_origin_y_mm = 0.0
-mks_origin_z_mm = 1700.0
+mks_origin_z_mm = 1300.0
 
 # origin (zero point) for head centroid
 head_origin_x_mm = 0
@@ -82,7 +82,10 @@ head_origin_z_mm = 1680
 ip_addr_L = "192.168.10.32"  # left stand
 ip_addr_R = "192.168.10.34"  # right stand
 ip_addr_F = "192.168.10.173"  # center stand
-ip_addr_S = "192.168.10.100"  # speaker mount
+ip_addr_S = "192.168.10.178"  # speaker mount
+
+# speaker stepping
+mks_S_step_deg = float(4200/90)
 
 #
 # ##################################################################################### #
@@ -102,10 +105,16 @@ _COORD_TYPE_DICT = {
 }
 _CMD_LIST = ["gozero", "setzero", "stop"]
 
+# speaker rotation
+_SPEAKER_ROTATION_CCW = 1
+_SPEAKER_ROTATION_MAX = 80
+_SPEAKER_ROTATION_MIN = -80
+_SPEAKER_ROTATION_STEP_MAX = 80*mks_S_step_deg
+_SPEAKER_ROTATION_STEP_MIN = -80*mks_S_step_deg
+
 #
 # Tools
 #
-
 
 def int_or_str(text):
     """Helper function for argument parsing."""
@@ -177,17 +186,130 @@ def mks_get_status(ip_addr, option):
 
     return result["status"]
 
+def mks_set_zero(ip_addr, option):
+    url = "http://" + str(ip_addr) + "/zero/set/"
+    response = requests.post(url)
 
-def mks_set_positions(mks_position_F, mks_position_L, mks_position_R):
+    result = json.loads(response.text)
+    if result["error"] != 0:
+        return -1
+
+    return result["status"]
+
+def mks_get_inclinometer(ip_addr, option):
+    url = "http://" + str(ip_addr) + "/status/get/"
+    response = requests.get(url)
+
+    result = json.loads(response.text)
+    if result["error"] != 0:
+        return -1
+
+    return ( result["status"], [result["accel"]["x"],result["accel"]["y"],result["accel"]["z"]] )    
+
+
+def mks_rotate_speaker(mks_degree):
+
+    #########
+    # STEP #1: read inclinometer 3 times for average
+    logger.info("mks_rotate_speaker: read inclinometer.")
+
+    acc = []
+
+    status = 0
+
+    while ( (status==0) and (len(acc)<3) ):
+        time.sleep(0.5)
+        status, accel = mks_get_inclinometer(ip_addr_S, 0)
+        acc.append(accel[1])
+
+    if status != 0:
+        logger.error("mks_rotate_speaker: error while getting status.")
+        return -1
+
+    acc_sum=0
+    for x in acc:
+        acc_sum+=x
+    
+    x =acc_sum/len(acc)
+
+    angle = (90 - math.degrees(math.acos(x/9.8)))
+
+    angle = angle - mks_degree
+
+    # if( _SPEAKER_ROTATION_CCW ):
+    #     angle = angle - mks_degre
+    # else:
+    #     angle = angle +mks_degree
+
+    position_step = angle*mks_S_step_deg
+
+    if( _SPEAKER_ROTATION_CCW ):
+        position_step *= -1
+
+    if(position_step > _SPEAKER_ROTATION_STEP_MIN) and (position_step<_SPEAKER_ROTATION_STEP_MAX):
+        mks_set_position(ip_addr_S, position_step)
+
+    
+def mks_set_position(ip_addr, mks_position):
     rv = 0
 
-    logger.info("mks_set_position, mks_F: " + str(mks_position_F))
-    logger.info("mks_set_position, mks_L: " + str(mks_position_L))
-    logger.info("mks_set_position, mks_R: " + str(mks_position_R))
+    logger.info("mks_set_position, value: " + str(mks_position))
+
 
     #########
     # STEP #0: GET current position and verify status
     logger.info("mks_set_position: get current status.")
+
+    err = mks_get_status(ip_addr,0)
+
+    if err != 0:
+        logger.error("mks_set_position: error while executing GET POSITION")
+
+    #########
+    # STEP #1: SET current position and verify status
+    logger.info("mks_set_position: positioning started.")
+
+    err = mks_set_length(ip_addr, mks_position)
+
+    if err != 0:
+        logger.error("mks_set_position: error while executing SET POSITION")
+
+    #########
+    # STEP #2: monitor & wait until position is done
+    logger.info("mks_set_position: wait/veryfy position completed.")
+
+    if err == 0:
+        status = 1
+        while (status != 0) and (status != -1):
+            time.sleep(1)
+
+            status = mks_get_status(ip_addr,0)
+            
+            if status == -1:
+                logger.error("mks_set_position: error while positioning.")
+            else:
+                logger.info("mks_set_position: positioning done.")
+
+    # return negative on error. zero on position completed
+    rv = 0
+    if status != 0:
+        rv = -1
+
+    return rv
+
+
+
+
+def mks_set_positions(mks_position_F, mks_position_L, mks_position_R):
+    rv = 0
+
+    logger.info("mks_set_positions, mks_F: " + str(mks_position_F))
+    logger.info("mks_set_positions, mks_L: " + str(mks_position_L))
+    logger.info("mks_set_positions, mks_R: " + str(mks_position_R))
+
+    #########
+    # STEP #0: GET current position and verify status
+    logger.info("mks_set_positions: get current status.")
 
     task_args = [(ip_addr_F, mks_position_F), (ip_addr_L, mks_position_L), (ip_addr_R, mks_position_R)]
 
@@ -200,11 +322,11 @@ def mks_set_positions(mks_position_F, mks_position_L, mks_position_R):
         err += result
 
     if err != 0:
-        logger.error("mks_set_position: error while executing GET POSITION")
+        logger.error("mks_set_positions: error while executing GET POSITION")
 
     #########
     # STEP #1: SET current position and verify status
-    logger.info("mks_set_position: positioning started.")
+    logger.info("mks_set_positions: positioning started.")
 
     task_args = [(ip_addr_F, mks_position_F), (ip_addr_L, mks_position_L), (ip_addr_R, mks_position_R)]
 
@@ -217,11 +339,11 @@ def mks_set_positions(mks_position_F, mks_position_L, mks_position_R):
         err += result
 
     if err != 0:
-        logger.error("mks_set_position: error while executing SET POSITION")
+        logger.error("mks_set_positions: error while executing SET POSITION")
 
     #########
     # STEP #2: monitor & wait until position is done
-    logger.info("mks_set_position: wait/veryfy position completed.")
+    logger.info("mks_set_positions: wait/veryfy position completed.")
 
     task_args = [(ip_addr_F, mks_position_F), (ip_addr_L, mks_position_L), (ip_addr_R, mks_position_R)]
 
@@ -237,11 +359,11 @@ def mks_set_positions(mks_position_F, mks_position_L, mks_position_R):
             result_sum = 0
             for result in results:
                 if result == -1:
-                    logger.error("mks_set_position: error while positioning.")
+                    logger.error("mks_set_positions: error while positioning.")
                     status = -1
                 result_sum += result
             if result_sum == 0:
-                logger.info("mks_set_position: positioning done.")
+                logger.info("mks_set_positions: positioning done.")
                 status = 0
 
     # return negative on error. zero on position completed
@@ -347,13 +469,30 @@ def get_select(args):
 #
 # CMD Commands
 #
+def cmd_setzero():
+    task_args = [(ip_addr_F, 0), (ip_addr_L, 0), (ip_addr_R, 0), (ip_addr_S, 0)]
 
+    with multiprocessing.Pool(processes=4) as pool:
+        results = pool.starmap(mks_set_zero, task_args)
+
+    # check result for errors
+    err = 0
+    for result in results:
+        err += result
+
+    if err != 0:
+        logger.error("mks_set_positions: error while executing SET POSITION")
+        return -1
+
+    return 0
 
 def cmd_select(args):
     rv = 0
 
     if "gozero" == args.command[1]:
         rv = set_position(mks_origin_x_mm, mks_origin_y_mm, mks_origin_z_mm, "ac")
+    elif "setzero" == args.command[1]:
+        rv = cmd_setzero()
     else:
         logger.error("unsupported CMD option")
         rv = -1
@@ -382,6 +521,14 @@ if __name__ == "__main__":
         nargs=1,
         default=None,
         help="param name (default: %(default)s)",
+    )
+
+    parser.add_argument(
+        "-r",
+        "--rotate",
+        type=int,
+        nargs=1,
+        help="rotate speaker [%(_SPEAKER_ROTATION_MAX)s | %(_SPEAKER_ROTATION_MIN)s] ",
     )
 
     parser.add_argument(
@@ -501,5 +648,14 @@ if __name__ == "__main__":
     else:
         logger.error("Command invalid/unsupported.")
         exit(0)
+
+    #
+    # check for speaker rotation
+    #
+    if args.rotate:
+        if (args.rotate[0] < _SPEAKER_ROTATION_MAX) and (args.rotate[0] > _SPEAKER_ROTATION_MIN):
+            mks_rotate_speaker(args.rotate[0])
+        else:
+            logger.error("speaker rotation outside of boundaries")
 
     logger.info("done.")
