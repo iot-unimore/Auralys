@@ -187,14 +187,13 @@ def mks_get_status(ip_addr, option):
     return result["status"]
 
 def mks_set_zero(ip_addr, option):
-    url = "http://" + str(ip_addr) + "/zero/set/"
-    response = requests.post(url)
-
+    url = "http://" + str(ip_addr) + "/position/zero/set/"
+    response = requests.post(url, data=str(int(option)))
     result = json.loads(response.text)
     if result["error"] != 0:
         return -1
 
-    return result["status"]
+    return 0
 
 def mks_get_inclinometer(ip_addr, option):
     url = "http://" + str(ip_addr) + "/status/get/"
