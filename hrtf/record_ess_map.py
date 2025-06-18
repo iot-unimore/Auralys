@@ -400,6 +400,15 @@ if __name__ == "__main__":
         help="verbose (default: %(default)s)",
     )
 
+    parser.add_argument(
+        "-t",
+        "--test",
+        action="store_true",
+        default=False,
+        help="dry-run for rotation testing (default: %(default)s)",
+    )
+
+
     args, remaining = parser.parse_known_args(remaining)
 
     #
@@ -493,6 +502,9 @@ if __name__ == "__main__":
     else:
         sys.exit("\n[ERROR] missing audio ESS yaml config file.")
 
+
+    print(yaml_params)
+
     #
     # run measure loop for audio sweep recording
     #
@@ -566,7 +578,9 @@ if __name__ == "__main__":
 
                 # rotating table position is now set: sleep 1s and start recording
                 time.sleep(1)
-                record_ess.run_main(**yaml_params)
+
+                if(not(yaml_params["test"])):
+                    record_ess.run_main(**yaml_params)
             else:
                 logger.error("[ERROR]: cannot set rotating table position, angle={}".format(angle_adj))
 
