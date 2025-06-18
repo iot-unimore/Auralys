@@ -1,1 +1,0 @@
-../rotating_table/WilsonMotor/cmd_get_position.sh
