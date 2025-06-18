@@ -11,6 +11,7 @@ import json
 import subprocess
 import time
 import math
+import os
 
 import record_ess
 
@@ -33,6 +34,8 @@ def int_or_str(text):
 #
 # DEFINES / CONSTANT / GLOBALS
 #
+_ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
+
 CONFIG_SYNTAX_NAME = "audio_measure_map"
 CONFIG_SYNTAX_VERSION_MIN = 0.1
 
@@ -408,7 +411,6 @@ if __name__ == "__main__":
         help="dry-run for rotation testing (default: %(default)s)",
     )
 
-
     args, remaining = parser.parse_known_args(remaining)
 
     #
@@ -502,7 +504,6 @@ if __name__ == "__main__":
     else:
         sys.exit("\n[ERROR] missing audio ESS yaml config file.")
 
-
     print(yaml_params)
 
     #
@@ -564,22 +565,26 @@ if __name__ == "__main__":
             #     logger.error("[ERROR]: cannot set rotating table position, angle={}".format(angle_adj))
 
             # rotate table
-            rv = subprocess.run(["./cmd_set_position.sh", str(angle_adj)], stdout=subprocess.PIPE).stdout.decode("utf-8")
+            rv = subprocess.run(
+                [_ROOT_DIR + "/cmd_set_position.sh", str(angle_adj)], stdout=subprocess.PIPE
+            ).stdout.decode("utf-8")
             result = json.loads(rv)
 
             if result["error"] == 0:
-                rv = subprocess.run(["./cmd_get_position.sh"], stdout=subprocess.PIPE).stdout.decode("utf-8")
+                rv = subprocess.run([_ROOT_DIR + "/cmd_get_position.sh"], stdout=subprocess.PIPE).stdout.decode("utf-8")
                 result = json.loads(rv)
 
                 while result["position"] != angle_adj:
                     time.sleep(2)
-                    rv = subprocess.run(["./cmd_get_position.sh"], stdout=subprocess.PIPE).stdout.decode("utf-8")
+                    rv = subprocess.run([_ROOT_DIR + "/cmd_get_position.sh"], stdout=subprocess.PIPE).stdout.decode(
+                        "utf-8"
+                    )
                     result = json.loads(rv)
 
                 # rotating table position is now set: sleep 1s and start recording
                 time.sleep(1)
 
-                if(not(yaml_params["test"])):
+                if not (yaml_params["test"]):
                     record_ess.run_main(**yaml_params)
             else:
                 logger.error("[ERROR]: cannot set rotating table position, angle={}".format(angle_adj))
