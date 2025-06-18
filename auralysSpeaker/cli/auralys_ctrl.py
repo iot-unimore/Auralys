@@ -66,7 +66,7 @@ max_x_cartesian = dF_mm - 100
 min_y_cartesian = -(dR_mm - 100)
 max_y_cartesian = dL_mm - 100
 min_z_cartesian = 400
-max_z_cartesian = min(hL_mm,hR_mm,hF_mm) - 100
+max_z_cartesian = min(hL_mm, hR_mm, hF_mm) - 100
 
 # origin (zero point) for MKS steppers
 mks_origin_x_mm = 800.0
@@ -85,7 +85,7 @@ ip_addr_F = "192.168.10.173"  # center stand
 ip_addr_S = "192.168.10.178"  # speaker mount
 
 # speaker stepping
-mks_S_step_deg = float(4200/90)
+mks_S_step_deg = float(4200 / 90)
 
 #
 # ##################################################################################### #
@@ -109,12 +109,13 @@ _CMD_LIST = ["gozero", "setzero", "stop"]
 _SPEAKER_ROTATION_CCW = 1
 _SPEAKER_ROTATION_MAX = 80
 _SPEAKER_ROTATION_MIN = -80
-_SPEAKER_ROTATION_STEP_MAX = 80*mks_S_step_deg
-_SPEAKER_ROTATION_STEP_MIN = -80*mks_S_step_deg
+_SPEAKER_ROTATION_STEP_MAX = 80 * mks_S_step_deg
+_SPEAKER_ROTATION_STEP_MIN = -80 * mks_S_step_deg
 
 #
 # Tools
 #
+
 
 def int_or_str(text):
     """Helper function for argument parsing."""
@@ -160,7 +161,14 @@ def verify_coord_limits(x, y, z):
 
 
 def verify_coord_cartesian_limits(x, y, z):
-    if ( (x>max_x_cartesian) or (x<min_x_cartesian) or (z>max_z_cartesian) or (z<min_z_cartesian) or (y>max_y_cartesian) or (y<min_y_cartesian)):
+    if (
+        (x > max_x_cartesian)
+        or (x < min_x_cartesian)
+        or (z > max_z_cartesian)
+        or (z < min_z_cartesian)
+        or (y > max_y_cartesian)
+        or (y < min_y_cartesian)
+    ):
         return -1
 
     return 0
@@ -186,6 +194,7 @@ def mks_get_status(ip_addr, option):
 
     return result["status"]
 
+
 def mks_set_zero(ip_addr, option):
     url = "http://" + str(ip_addr) + "/position/zero/set/"
     response = requests.post(url, data=str(int(option)))
@@ -195,6 +204,7 @@ def mks_set_zero(ip_addr, option):
 
     return 0
 
+
 def mks_get_inclinometer(ip_addr, option):
     url = "http://" + str(ip_addr) + "/status/get/"
     response = requests.get(url)
@@ -203,11 +213,10 @@ def mks_get_inclinometer(ip_addr, option):
     if result["error"] != 0:
         return -1
 
-    return ( result["status"], [result["accel"]["x"],result["accel"]["y"],result["accel"]["z"]] )    
+    return (result["status"], [result["accel"]["x"], result["accel"]["y"], result["accel"]["z"]])
 
 
 def mks_rotate_speaker(mks_degree):
-
     #########
     # STEP #1: read inclinometer 3 times for average
     logger.info("mks_rotate_speaker: read inclinometer.")
@@ -216,7 +225,7 @@ def mks_rotate_speaker(mks_degree):
 
     status = 0
 
-    while ( (status==0) and (len(acc)<3) ):
+    while (status == 0) and (len(acc) < 3):
         time.sleep(0.5)
         status, accel = mks_get_inclinometer(ip_addr_S, 0)
         acc.append(accel[1])
@@ -225,13 +234,13 @@ def mks_rotate_speaker(mks_degree):
         logger.error("mks_rotate_speaker: error while getting status.")
         return -1
 
-    acc_sum=0
+    acc_sum = 0
     for x in acc:
-        acc_sum+=x
-    
-    x =acc_sum/len(acc)
+        acc_sum += x
 
-    angle = (90 - math.degrees(math.acos(x/9.8)))
+    x = acc_sum / len(acc)
+
+    angle = 90 - math.degrees(math.acos(x / 9.8))
 
     angle = angle - mks_degree
 
@@ -240,26 +249,25 @@ def mks_rotate_speaker(mks_degree):
     # else:
     #     angle = angle +mks_degree
 
-    position_step = angle*mks_S_step_deg
+    position_step = angle * mks_S_step_deg
 
-    if( _SPEAKER_ROTATION_CCW ):
+    if _SPEAKER_ROTATION_CCW:
         position_step *= -1
 
-    if(position_step > _SPEAKER_ROTATION_STEP_MIN) and (position_step<_SPEAKER_ROTATION_STEP_MAX):
+    if (position_step > _SPEAKER_ROTATION_STEP_MIN) and (position_step < _SPEAKER_ROTATION_STEP_MAX):
         mks_set_position(ip_addr_S, position_step)
 
-    
+
 def mks_set_position(ip_addr, mks_position):
     rv = 0
 
     logger.info("mks_set_position, value: " + str(mks_position))
 
-
     #########
     # STEP #0: GET current position and verify status
     logger.info("mks_set_position: get current status.")
 
-    err = mks_get_status(ip_addr,0)
+    err = mks_get_status(ip_addr, 0)
 
     if err != 0:
         logger.error("mks_set_position: error while executing GET POSITION")
@@ -282,8 +290,8 @@ def mks_set_position(ip_addr, mks_position):
         while (status != 0) and (status != -1):
             time.sleep(1)
 
-            status = mks_get_status(ip_addr,0)
-            
+            status = mks_get_status(ip_addr, 0)
+
             if status == -1:
                 logger.error("mks_set_position: error while positioning.")
             else:
@@ -295,8 +303,6 @@ def mks_set_position(ip_addr, mks_position):
         rv = -1
 
     return rv
-
-
 
 
 def mks_set_positions(mks_position_F, mks_position_L, mks_position_R):
@@ -385,14 +391,13 @@ def set_position(x, y, z, type):
     # COORD TYPE: absolute cartesian
     if "ac" == type:
         # SANITY CHECK
-        if (0 != verify_coord_limits(x, y, z)):
+        if 0 != verify_coord_limits(x, y, z):
             logger.error("coordinates verification failed.")
             return -1
 
-        if (0 != verify_coord_cartesian_limits(x,y,x)):
+        if 0 != verify_coord_cartesian_limits(x, y, x):
             logger.error("coordinates verification failed.")
             return -1
-
 
         [mks_originL, mks_originR, mks_originF] = compute_wires_length(
             float(mks_origin_x_mm), float(mks_origin_y_mm), float(mks_origin_z_mm)
@@ -485,6 +490,7 @@ def cmd_setzero():
 
     return 0
 
+
 def cmd_select(args):
     rv = 0
 
@@ -527,7 +533,7 @@ if __name__ == "__main__":
         "--rotate",
         type=int,
         nargs=1,
-        help="rotate speaker [%(_SPEAKER_ROTATION_MAX)s | %(_SPEAKER_ROTATION_MIN)s] ",
+        help=f"rotate speaker [{_SPEAKER_ROTATION_MAX} | {_SPEAKER_ROTATION_MIN}] ",
     )
 
     parser.add_argument(
