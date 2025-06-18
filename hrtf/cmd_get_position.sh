@@ -1,0 +1,1 @@
+../auralysRotatingTable/cmd_raw/cmd_get_position.sh
