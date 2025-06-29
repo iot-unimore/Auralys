@@ -184,7 +184,7 @@ HW_PCB_CONFIG_T hw_config = {
 #define SCREEN_HEIGHT     (64)
 #define OLED_RESET        (-1)
 
-const char DISPLAY_HW_UNIT_TYPE[] = { 'N', 'L', 'R', 'F', 'S' };
+const char DISPLAY_HW_UNIT_TYPE[] = { 'N', 'L', 'R', 'F', 'S', 'T' };
 
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #endif

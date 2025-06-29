@@ -51,6 +51,7 @@ DETAILS:
 #define HW_UNIT_TYPE_RIGHT                   (2)
 #define HW_UNIT_TYPE_FRONT                   (3)
 #define HW_UNIT_TYPE_SPEAKER                 (4)
+#define HW_UNIT_TYPE_TURNTABLE               (5)
 
 #define HW_UNIT_ORIENTATION_VERTICAL_UP      (0)
 #define HW_UNIT_ORIENTATION_VERTICAL_DW      (1)
