@@ -2,6 +2,6 @@
 
 rm -rf ./build
 
-~/bin/uncrustify -c ./uncrustify.cfg ./*.ino --replace --no-backup
+~/bin/uncrustify -c ./auralys-uncrustify.cfg ./*.ino --replace --no-backup
 
 chmod 644 ./*.ino
