@@ -32,9 +32,17 @@
 /* internal libraries                                                            */
 /* ============================================================================= */
 
+/* ============================================================================= */
+/* internal libraries                                                            */
+/* ============================================================================= */
+#include <Arduino.h>
+
+#include <WiFi.h>
+#include <WiFiManager.h>
+#include <esp_wifi.h>
+
 #include <Wire.h>
 #include <ArduinoJson.h>
-#include <WiFi.h>
 
 #include <esp_adc/adc_continuous.h>
 #include <esp_adc/adc_cali.h> // esp_adc_cal.h>
@@ -54,7 +62,7 @@
 
 /* Software Revision - BEGIN */
 #define SW_VER_MJR    (1) /* NOTE: 0->255, 1byte coded */
-#define SW_VER_MIN    (3) /* NOTE: 0->15,   4bit coded */
+#define SW_VER_MIN    (4) /* NOTE: 0->15,   4bit coded */
 #define SW_VER_REV    (0) /* NOTE: 0->3,    2bit coded */
 
 /* switch define for debug/release + qa build type */
@@ -97,12 +105,19 @@
 /* ============================================================================= */
 
 
-// Replace with your network credentials
-const char* ssid = "REPLACE_WITH_YOUR_SSID";
-const char* password = "REPLACE_WITH_YOUR_PASSWORD";
+//// Replace with your network credentials
+// const char* ssid = "REPLACE_WITH_YOUR_SSID";
+// const char* password = "REPLACE_WITH_YOUR_PASSWORD";
 
 // Set web server port number to 80
 const char* hostname = "rtable";
+
+/* hostname from hw */
+char device_hostname[16 + 1] = "aurtbl-000000000";
+#define BSP_RETRY_MAX (3)
+
+bool volatile wifi_connected = false;
+
 WiFiServer server(80);
 
 WiFiClient client;
@@ -1091,10 +1106,11 @@ void motion_loop()
 void webserver_init()
 {
     // Connect to Wi-Fi network with SSID and password
-    WiFi.setHostname(hostname);
-    LOG_MSG("Connecting to ");
-    LOG_MSGLN(ssid);
-    WiFi.begin(ssid, password);
+    // WiFi.setHostname(hostname);
+    // LOG_MSG("Connecting to ");
+    // LOG_MSGLN(ssid);
+    // WiFi.begin(ssid, password);
+
     while( WiFi.status() != WL_CONNECTED )
     {
         delay(500);
@@ -1349,6 +1365,8 @@ void setup()
 
     log_header();
 
+    bspSetup();
+
     // webserver
     webserver_init();
 
@@ -1404,6 +1422,8 @@ void positionRefresh(void* param)
 void loop()
 {
     count++;
+
+    bspLoop();
 
     webserver_loop();
 
