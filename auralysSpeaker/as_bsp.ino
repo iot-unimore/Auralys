@@ -372,6 +372,7 @@ void bspSetup()
     if( WiFi.isConnected() && (WiFi.status() == WL_CONNECTED))
     {
         WiFi.setSleep(false);
+        esp_wifi_set_ps(WIFI_PS_NONE);        
     }
 
     ledRgbSetColor(ledRgbColorOff);
@@ -419,6 +420,9 @@ void bspLoop()
             bspWiFiConfig(120); // 2min timeout
             bspDisplayCtrlFullscreen = false;
         }
+
+        WiFi.setSleep(false);
+        esp_wifi_set_ps(WIFI_PS_NONE);        
 
         ledRgbSetColor(ledRgbColorOff);
     }
