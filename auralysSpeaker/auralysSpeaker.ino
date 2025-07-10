@@ -77,8 +77,8 @@
 
 /* Software Revision - BEGIN */
 #define SW_VER_MJR    (0) /* NOTE: 0->255, 1byte coded */
-#define SW_VER_MIN    (3) /* NOTE: 0->15,   4bit coded */
-#define SW_VER_REV    (3) /* NOTE: 0->3,    2bit coded  */
+#define SW_VER_MIN    (4) /* NOTE: 0->15,   4bit coded */
+#define SW_VER_REV    (0) /* NOTE: 0->3,    2bit coded  */
 
 /* switch define for debug/release + qa build type */
 #define DEBUG
@@ -370,8 +370,8 @@ uint8_t rxCnt = 0; // Receive data count
 
 uint8_t mksMotorSlaveAddr = 0x01;
 
-int32_t mksMotorMax = (163840 * 10);
-int32_t mksMotorMin = (-163840 * 10);
+int32_t mksMotorMax = 0x7FFFFFFFll; //(2147483647); // +(2^31-1)
+int32_t mksMotorMin = 0x80000000ll; //(-2147483648); // -(2^31)
 uint16_t mksMotorSpeed = 250;
 uint16_t mksMotorAccel = 3;
 volatile int64_t mksMotorEncoder = 0;

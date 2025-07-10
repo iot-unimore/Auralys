@@ -349,10 +349,10 @@ int8_t setMksMotorPosition3(uint8_t slaveAddr, uint16_t speed, uint8_t acc, int3
     txBuffer[3] = (speed >> 8) & 0x00FF; // 8 bit higher speed
     txBuffer[4] = speed & 0x00FF; // 8 bits lower
     txBuffer[5] = acc; // acceleration
-    txBuffer[6] = (absAxis >> 24) & 0xFF; // Absolute coordinates bit31 - bit24
-    txBuffer[7] = (absAxis >> 16) & 0xFF; // Absolute coordinates bit23 - bit16
-    txBuffer[8] = (absAxis >> 8) & 0xFF; // Absolute coordinates bit15 - bit8
-    txBuffer[9] = (absAxis >> 0) & 0xFF; // Absolute coordinates bit7 - bit0
+    txBuffer[6] = (((uint32_t)absAxis) >> 24) & 0xFF; // Absolute coordinates bit31 - bit24
+    txBuffer[7] = (((uint32_t)absAxis) >> 16) & 0xFF; // Absolute coordinates bit23 - bit16
+    txBuffer[8] = (((uint32_t)absAxis) >> 8) & 0xFF; // Absolute coordinates bit15 - bit8
+    txBuffer[9] = (((uint32_t)absAxis) >> 0) & 0xFF; // Absolute coordinates bit7 - bit0
     txBuffer[10] = mksGetCheckSum(txBuffer, 10); // Calculate checksum
 
     Serial1.write(txBuffer, 11);
