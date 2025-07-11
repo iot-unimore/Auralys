@@ -575,7 +575,7 @@ if __name__ == "__main__":
                 result = json.loads(rv)
 
                 while result["position"] != angle_adj:
-                    time.sleep(2)
+                    time.sleep(3)
                     rv = subprocess.run([_ROOT_DIR + "/cmd_get_position.sh"], stdout=subprocess.PIPE).stdout.decode(
                         "utf-8"
                     )

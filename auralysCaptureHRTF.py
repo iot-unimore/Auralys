@@ -47,8 +47,8 @@ def update_ess_map_params(input_file_path, output_file_path, elevation_begin, el
         data = yaml.safe_load(file)
 
     # Update the fields
-    data['elevation_begin'] = elevation_begin
-    data['elevation_end'] = elevation_end
+    data['elevation_begin'] = int(elevation_begin)
+    data['elevation_end'] = int(elevation_end)
 
     # Write the modified YAML to the output file
     with open(output_file_path, 'w') as file:
@@ -68,7 +68,7 @@ if __name__ == "__main__":
         print("==============================================================")
 
         # move speaker in position
-        rv = subprocess.run(["./auralysSpeaker/cli/auralys_ctrl.py","-c","set", "position", "-p", str(position), "-r", str(-1*int(row[0])), "-t", "ac", "-v" ], stdout=subprocess.PIPE).stdout.decode("utf-8")
+        rv = subprocess.run(["./auralysSpeaker/cli/auralys_ctrl.py","-c","set", "position", "-p", str(position), "-rs", str(-1*int(row[0])), "-t", "ac", "-v" ], stdout=subprocess.PIPE).stdout.decode("utf-8")
 
         # wait for stabilization of the speaker
         time.sleep(3)
@@ -87,15 +87,12 @@ if __name__ == "__main__":
         # rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","1","-as","-45","-m","./hrtf/measures/test","-n","test","-t"], stdout=subprocess.PIPE).stdout.decode("utf-8")
 
         # step 90 deg, DRY-RUN
-        #rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-90","-m","./hrtf/measures/test","-n","test","-t"], stdout=subprocess.PIPE).stdout.decode("utf-8")
+        rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-90","-m","./hrtf/measures/test","-n","test","-t"], stdout=subprocess.PIPE).stdout.decode("utf-8")
         
         # step 120 deg, SWEEP
-        rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-120","-m","./hrtf/measures/test","-n","test"], stdout=subprocess.PIPE).stdout.decode("utf-8")
+        #rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-120","-m","./hrtf/measures/test","-n","test"], stdout=subprocess.PIPE).stdout.decode("utf-8")
         
     time.sleep(3)
 
-    # back to zero position: speaker
-    rv = subprocess.run(["./auralysSpeaker/cli/auralys_ctrl.py","-c","cmd", "gozero", "-r", "0", "-v" ], stdout=subprocess.PIPE).stdout.decode("utf-8")
-
-    # back to zero position: rotating table
-    rv = subprocess.run(["./hrtf/cmd_set_position.sh","0"], stdout=subprocess.PIPE).stdout.decode("utf-8")
+    # back to zero position: speaker & table
+    rv = subprocess.run(["./auralysSpeaker/cli/auralys_ctrl.py","-c","cmd", "gozero", "-rs", "0", "-rt", "0", "-v" ], stdout=subprocess.PIPE).stdout.decode("utf-8")

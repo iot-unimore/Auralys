@@ -672,20 +672,17 @@ if __name__ == "__main__":
     #
     # sanity checks to validate input params
     #
-    if args.command == None:
-        logger.error("Command missing.")
-        exit(0)
 
-    if args.command[0] == "set":
-        set_select(args)
-    elif args.command[0] == "get":
-        get_select(args)
-    elif args.command[0] == "cmd":
-        cmd_select(args)
-    else:
-        logger.error("Command invalid/unsupported.")
-        exit(0)
-
+    if args.command != None:
+        if args.command[0] == "set":
+            set_select(args)
+        elif args.command[0] == "get":
+            get_select(args)
+        elif args.command[0] == "cmd":
+            cmd_select(args)
+        else:
+            logger.error("Command invalid/unsupported.")
+            exit(0)
     #
     # check for speaker rotation
     #
