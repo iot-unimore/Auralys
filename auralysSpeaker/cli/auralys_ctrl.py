@@ -40,21 +40,21 @@ logger = logging.getLogger(__name__)
 #          (R)
 
 # left stand position and size
-hL_mm = 2600.0
-dL_mm = 550.0
+hL_mm = 3000.0
+dL_mm = 600.0
 maxL = 600000.0
 minL = -700000.0
 mks_L_step_mm = float(1000000.0 / 1570.0)
 
 # right stand position and size
-hR_mm = 2600.0
-dR_mm = 550.0
+hR_mm = 3000.0
+dR_mm = 600.0
 maxR = 600000.0
 minR = -700000.0
 mks_R_step_mm = float(1000000.0 / 1600.0)
 
 # front stand position and size
-hF_mm = 2600.0
+hF_mm = 3000.0
 dF_mm = 1540.0
 maxF = 700000.0
 minF = -800000.0
@@ -81,11 +81,16 @@ head_origin_z_mm = 1680
 # ip_addresses of the auralys units
 ip_addr_L = "192.168.10.32"  # left stand
 ip_addr_R = "192.168.10.34"  # right stand
-ip_addr_F = "192.168.10.173"  # center stand
-ip_addr_S = "192.168.10.178"  # speaker mount
+ip_addr_F = "192.168.10.240"  # center stand
+ip_addr_S = "192.168.10.178"  # rotating speaker
+ip_addr_T = "192.168.10.96"  # rotating table
 
 # speaker stepping
 mks_S_step_deg = float(4200 / 90)
+
+# rotating table stepping
+mks_T_step_deg = float(2454840 / 360)
+
 
 #
 # ##################################################################################### #
@@ -109,8 +114,17 @@ _CMD_LIST = ["gozero", "setzero", "stop"]
 _SPEAKER_ROTATION_CCW = 1
 _SPEAKER_ROTATION_MAX = 80
 _SPEAKER_ROTATION_MIN = -80
-_SPEAKER_ROTATION_STEP_MAX = 80 * mks_S_step_deg
-_SPEAKER_ROTATION_STEP_MIN = -80 * mks_S_step_deg
+_SPEAKER_ROTATION_STEP_MAX = _SPEAKER_ROTATION_MAX * mks_S_step_deg
+_SPEAKER_ROTATION_STEP_MIN = _SPEAKER_ROTATION_MIN * mks_S_step_deg
+
+
+# rotating table rotation
+_TABLE_ROTATION_CCW = 0
+_TABLE_ROTATION_MAX = 360
+_TABLE_ROTATION_MIN = -360
+_TABLE_ROTATION_STEP_MAX = _TABLE_ROTATION_MAX * mks_T_step_deg
+_TABLE_ROTATION_STEP_MIN = _TABLE_ROTATION_MIN * mks_T_step_deg
+
 
 #
 # Tools
@@ -214,6 +228,16 @@ def mks_get_inclinometer(ip_addr, option):
         return -1
 
     return (result["status"], [result["accel"]["x"], result["accel"]["y"], result["accel"]["z"]])
+
+
+def mks_rotate_table(mks_degree):
+    position_step = mks_degree * mks_T_step_deg
+
+    if _TABLE_ROTATION_CCW:
+        position_step *= -1
+
+    if (position_step > _TABLE_ROTATION_STEP_MIN) and (position_step < _TABLE_ROTATION_STEP_MAX):
+        mks_set_position(ip_addr_T, int(position_step))
 
 
 def mks_rotate_speaker(mks_degree):
@@ -529,11 +553,19 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-r",
-        "--rotate",
+        "-rs",
+        "--rspeaker",
         type=int,
         nargs=1,
         help=f"rotate speaker [{_SPEAKER_ROTATION_MAX} | {_SPEAKER_ROTATION_MIN}] ",
+    )
+
+    parser.add_argument(
+        "-rt",
+        "--rtable",
+        type=int,
+        nargs=1,
+        help=f"rotate turning table [{_SPEAKER_ROTATION_MAX} | {_SPEAKER_ROTATION_MIN}] ",
     )
 
     parser.add_argument(
@@ -657,10 +689,19 @@ if __name__ == "__main__":
     #
     # check for speaker rotation
     #
-    if args.rotate:
-        if (args.rotate[0] < _SPEAKER_ROTATION_MAX) and (args.rotate[0] > _SPEAKER_ROTATION_MIN):
-            mks_rotate_speaker(args.rotate[0])
+    if args.rspeaker:
+        if (args.rspeaker[0] < _SPEAKER_ROTATION_MAX) and (args.rspeaker[0] > _SPEAKER_ROTATION_MIN):
+            mks_rotate_speaker(args.rspeaker[0])
         else:
             logger.error("speaker rotation outside of boundaries")
+
+    #
+    # check for rotating_table rotation
+    #
+    if args.rtable:
+        if (args.rtable[0] < _TABLE_ROTATION_MAX) and (args.rtable[0] > _TABLE_ROTATION_MIN):
+            mks_rotate_table(args.rtable[0])
+        else:
+            logger.error("rotating-table rotation outside of boundaries")
 
     logger.info("done.")
