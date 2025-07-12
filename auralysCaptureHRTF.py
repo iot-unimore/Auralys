@@ -17,13 +17,13 @@ logger = logging.getLogger(__name__)
 auralysPositions = [
     # [75,  285, 2813],
     # [60,  550, 2703],
-    # [45,  778, 2528],
-#    [30,  953, 2300],
+    [45,  778, 2528],
+    [30,  953, 2300],
     [15,  1063,2035],
     [0,   1100,1750],
     [-15, 1063,1465],
-#    [-30, 953, 1200],
-#    [-45, 778,  972],
+    [-30, 953, 1200],
+    [-45, 778,  972],
     # [-60, 550,  797],
     # [-75, 285,  687]
 ]
@@ -31,7 +31,36 @@ auralysPositions = [
 #
 # TOOLS
 #
-def update_ess_map_params(input_file_path, output_file_path, elevation_begin, elevation_end):
+
+def find_audio_card():
+    audio_recording_hw_idx = 0
+    audio_playback_hw_idx = 0
+
+    # search for RECORDING card
+    rv = subprocess.check_output(["aplay -l | grep \"Fireface UFX (23703154)\""], shell=True)
+    if "card" in rv.decode():
+        audio_recording_hw_idx = (rv.decode().split(":"))[0]
+        audio_recording_hw_idx = (audio_recording_hw_idx.split(" "))[1]
+        print(audio_recording_hw_idx)
+    else:
+        print("ERROR: cannot find recording audio card Fireface UFX (23703154), exit.")
+        exit(0)
+
+    # search for PLAYBACK card
+    rv = subprocess.check_output(["aplay -l | grep \"Scarlett 2i2 USB\""], shell=True)
+    if "card" in rv.decode():
+        audio_playback_hw_idx = (rv.decode().split(":"))[0]
+        audio_playback_hw_idx = (audio_playback_hw_idx.split(" "))[1]
+        print(audio_playback_hw_idx)
+    else:
+        print("ERROR: cannot find recording audio card Scarlett 2i2 USB, exit.")
+        exit(0)
+
+    return [audio_recording_hw_idx, audio_playback_hw_idx]
+
+
+
+def update_ess_map_params(input_file_path, output_file_path, elevation_begin, elevation_end, hw_recoding_idx, hw_playback_idx):
     """
     Reads a YAML file, updates 'elevation_begin' and 'elevation_end' fields,
     and writes the modified content to a new file.
@@ -50,6 +79,9 @@ def update_ess_map_params(input_file_path, output_file_path, elevation_begin, el
     data['elevation_begin'] = int(elevation_begin)
     data['elevation_end'] = int(elevation_end)
 
+    data['input_device'] = "hw:"+hw_recoding_idx+",0"
+    data['output_device'] = "hw:"+hw_playback_idx+",0"
+
     # Write the modified YAML to the output file
     with open(output_file_path, 'w') as file:
         yaml.safe_dump(data, file, default_flow_style=False)
@@ -60,6 +92,17 @@ def update_ess_map_params(input_file_path, output_file_path, elevation_begin, el
 
 if __name__ == "__main__":
 
+    hw_rec_idx = 0
+    hw_play_idx = 0
+
+    #
+    # check for usb card idx
+    #
+    [hw_rec_idx, hw_play_idx] = find_audio_card()
+
+    #
+    # ESS mapping
+    #
     for row in auralysPositions:
 
         print("==============================================================")
@@ -76,8 +119,8 @@ if __name__ == "__main__":
 
         #
         # update params for new elevation
-        # 
-        update_ess_map_params("./hrtf/ess_map_params.yaml", "/tmp/ess_map_params.yaml", str(row[0]), str(row[0]))
+        #
+        update_ess_map_params("./hrtf/ess_map_params.yaml", "/tmp/ess_map_params.yaml", str(row[0]), str(row[0]), hw_rec_idx, hw_play_idx)
 
         #
         # record ess map
@@ -87,11 +130,11 @@ if __name__ == "__main__":
         # rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","1","-as","-45","-m","./hrtf/measures/test","-n","test","-t"], stdout=subprocess.PIPE).stdout.decode("utf-8")
 
         # step 90 deg, DRY-RUN
-        rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-90","-m","./hrtf/measures/test","-n","test","-t"], stdout=subprocess.PIPE).stdout.decode("utf-8")
-        
+        rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-120","-m","./hrtf/measures/test","-n","test","-t"], stdout=subprocess.PIPE).stdout.decode("utf-8")
+
         # step 120 deg, SWEEP
         #rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-120","-m","./hrtf/measures/test","-n","test"], stdout=subprocess.PIPE).stdout.decode("utf-8")
-        
+
     time.sleep(3)
 
     # back to zero position: speaker & table

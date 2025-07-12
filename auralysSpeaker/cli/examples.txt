@@ -1,3 +1,4 @@
 ./auralys_ctrl.py -c set position -p 800,0,1300 -t ac -v
-./auralys_ctrl.py -c cmd gozero -v -r 0
+./auralys_ctrl.py -c cmd gozero -v -rs 0 -rt 0
+./auralys_ctrl.py -c cmd gozero -v -rs 0 
 ./auralys_ctrl.py -c cmd setzero
