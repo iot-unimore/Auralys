@@ -1,5 +1,5 @@
 IMPORTANT: 
-
+==========
 If you are using an RME (www.rme-audio.de) audio card with linux,
 you need to add the following define to ~/.bashrc :
 
@@ -9,3 +9,7 @@ export PA_ALSA_PLUGHW
 
 note: make sure to log-out, log-in after adding the above.
 
+
+FFPLAY specific device playback:
+================================
+SDL_AUDIODRIVER="alsa" AUDIODEV="hw:2,0" ffplay ./pinknoise_0.8A_30s.wav
