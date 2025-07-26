@@ -570,13 +570,13 @@ if __name__ == "__main__":
         #
 
         # stimulus
-        ess_config["custom"]["stimulus"]["padding"]["pre"]["beep"] = 0
-        ess_config["custom"]["stimulus"]["padding"]["pre"]["value"] = args.playback_prepadding
-        ess_config["custom"]["stimulus"]["padding"]["post"]["beep"] = 0
-        ess_config["custom"]["stimulus"]["padding"]["post"]["value"] = args.playback_postpadding
-        ess_config["custom"]["stimulus"]["playback_amplitude"] = args.playback_amplitude
-        ess_config["custom"]["stimulus"]["frequency"]["begin"] = args.frequency_begin
-        ess_config["custom"]["stimulus"]["frequency"]["end"] = args.frequency_end
+        ess_config["custom"]["stimulus"]["sweep"]["padding"]["pre"]["beep"] = 0
+        ess_config["custom"]["stimulus"]["sweep"]["padding"]["pre"]["value"] = args.playback_prepadding
+        ess_config["custom"]["stimulus"]["sweep"]["padding"]["post"]["beep"] = 0
+        ess_config["custom"]["stimulus"]["sweep"]["padding"]["post"]["value"] = args.playback_postpadding
+        ess_config["custom"]["stimulus"]["sweep"]["amplitude"]["value"] = args.playback_amplitude
+        ess_config["custom"]["stimulus"]["sweep"]["frequency"]["begin"] = args.frequency_begin
+        ess_config["custom"]["stimulus"]["sweep"]["frequency"]["end"] = args.frequency_end
 
         # audio recording
         ess_config["custom"]["recording"]["samplerate"] = args.samplerate
