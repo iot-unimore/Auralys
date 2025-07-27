@@ -15,18 +15,19 @@ logger = logging.getLogger(__name__)
 
 # Define a table with 3 columns and 10 rows
 auralysPositions = [
-    # [75,  285, 2813],
-    # [60,  550, 2703],
-    [45,  778, 2528],
-    [30,  953, 2300],
-    [15,  1063,2035],
-    [0,   1100,1750],
-    [-15, 1063,1465],
-    [-30, 953, 1200],
-    [-45, 778,  972],
-    # [-60, 550,  797],
-    # [-75, 285,  687]
+    # [75,  259, 2616],
+    # [60,  500, 2516],
+    [45,  707,  2490],
+    [30,  866,  2200],
+    [15,  910,  2000],
+    [0,   1000, 1650],
+    [-15, 960,  1391],
+    [-30, 870,  1100],
+    [-45, 800,   900],
+    # [-60, 500,  784],
+    # [-75, 259,  684]
 ]
+
 
 #
 # TOOLS
@@ -127,13 +128,17 @@ if __name__ == "__main__":
         #
 
         # step 45 deg, DRY-RUN
-        # rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","1","-as","-45","-m","./hrtf/measures/test","-n","test","-t"], stdout=subprocess.PIPE).stdout.decode("utf-8")
+        # rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","1","-as","-45","-m","./hrtf/measupres/test","-n","test","-t"], stdout=subprocess.PIPE).stdout.decode("utf-8")
 
         # step 90 deg, DRY-RUN
-        rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-120","-m","./hrtf/measures/test","-n","test","-t"], stdout=subprocess.PIPE).stdout.decode("utf-8")
+        #rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-180","-m","./hrtf/measures/test","-n","test","-t"], stdout=subprocess.PIPE).stdout.decode("utf-8")
 
         # step 120 deg, SWEEP
         #rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-120","-m","./hrtf/measures/test","-n","test"], stdout=subprocess.PIPE).stdout.decode("utf-8")
+
+
+        # step 10 deg, SWEEP
+        rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-10","-m","/media/gfilippi/audiodata/wilsonClean_20250725-001","-n","wilsonClean"], stdout=subprocess.PIPE).stdout.decode("utf-8")
 
     time.sleep(3)
 
