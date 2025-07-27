@@ -112,7 +112,7 @@ room:
         units: ['metre']
   calibration:
     noise_floor:
-       value: 45.0
+       value: 42.0
        type: dbA,slow
        units: ['db']
 
@@ -154,13 +154,13 @@ setup:
           device_type: speaker
           calibration:
             whitenoise:
-              spl_1m_dbA_slow: 70.0
+              spl_1m_dbA_slow: 75.0
               wav_peak_level: 0.8
             pinknoise:
-              spl_1m_dbA_slow: 60.0
+              spl_1m_dbA_slow: 65.0
               wav_peak_level: 0.8
             sine-1khz:
-              spl_1m_dbA_slow: 70.5
+              spl_1m_dbA_slow: 70.0
               wav_peak_level: 0.8
           position:
             coord:
