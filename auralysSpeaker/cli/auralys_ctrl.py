@@ -69,7 +69,7 @@ min_z_cartesian = 400
 max_z_cartesian = min(hL_mm, hR_mm, hF_mm) - 100
 
 # origin (zero point) for MKS steppers
-mks_origin_x_mm = 800.0
+mks_origin_x_mm = 700.0
 mks_origin_y_mm = 0.0
 mks_origin_z_mm = 1300.0
 
