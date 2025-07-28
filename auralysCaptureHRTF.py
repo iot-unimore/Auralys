@@ -138,7 +138,7 @@ if __name__ == "__main__":
 
 
         # step 10 deg, SWEEP
-        rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-10","-m","/media/gfilippi/audiodata/wilsonClean_20250725-001","-n","wilsonClean"], stdout=subprocess.PIPE).stdout.decode("utf-8")
+        rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-10","-m","/media/gfilippi/audiodata/wilsonTest_20250728-001","-n","wilsonTest"], stdout=subprocess.PIPE).stdout.decode("utf-8")
 
     time.sleep(3)
 
