@@ -34,9 +34,9 @@ _MIN_MEM_GB = 2.0  # min amount of memory for each compute process
 _MAX_MEM_GB = 3.5  # max amount of memory for each compute process
 
 # IR WINDOW FILTER, values in seconds
-_IR_WINDOW_FADEIN_s = 0.001
-_IR_WINDOW_FADEOUT_s = 0.1
-_IR_WINDOW_LENGTH_s = 0.4
+_IR_WINDOW_FADEIN_s = 0.002
+_IR_WINDOW_FADEOUT_s = 0.002
+_IR_WINDOW_LENGTH_s = 0.5
 
 # IR_INFO for pyfar data storage
 _IR_INFO_DELAY = 0
@@ -54,6 +54,8 @@ _MAX_SMOOTHING_MEM_GB = 60
 #
 # receivers pair indication with ess_params naming for 3dti extraction
 receivers_pairs = ["binaural", "array_six,front", "array_six,middle", "array_six,rear"]
+
+_SOUND_SPEED = 343  # m/s
 
 
 #
@@ -305,15 +307,32 @@ def compute_hrir(folder=None):
         )
     )
 
+    #
+    # STIMULUS
+    #
+
     # stimulus: this is the full signal
     xsweep_full = data[:, tx_track_id]
 
     # stimulus: remove loop-recording delay and paddings
     xsweep = data[xsweep_head:xsweep_tail, tx_track_id]
 
+    # WORKAROUND :  LINUX ALSA AUDIO CARD, anti pop FADE-IN BIAS correction
+    if 1:
+        alsa_fade_in = np.linspace(0.8, 1, int(samplerate / 4))
+        xsweep_full[xsweep_head : (xsweep_head + alsa_fade_in.size)] *= alsa_fade_in
+        xsweep[0 : alsa_fade_in.size] *= alsa_fade_in
+
     # max/min
-    xsweep_max = np.max(xsweep)
+    # xsweep_max = np.max(np.abs(xsweep))
     # xsweep_min = np.min(xsweep)
+    # if 1:
+    #     plt.figure()
+    #     plt.plot(xsweep_full)
+    #     plt.show()
+    #     plt.figure()
+    #     plt.plot(xsweep)
+    #     plt.show()
 
     # sweep duration from recorded signal
     T = (xsweep_tail - xsweep_head) / fs  # len(x) / fs
@@ -331,12 +350,7 @@ def compute_hrir(folder=None):
 
     # compute inverse mirror filter (equalized)
     k_sweep = np.exp(t_sweep * R / T)
-    # k_ones = np.ones(padding_post_computed)
-    # k = list(k_ones) + list(k_sweep)
-
-    # inverse sweep (filter, f)
-    # f = 0.1 * xsweep[::-1] / k_sweep
-    f = 0.1 * xsweep[::-1] / k_sweep
+    f = xsweep[::-1] / k_sweep
 
     # adding pre and post zero padding: note the signal is reversed as per A.Farina technique
     # so first we add padding-post, then padding-pre
@@ -357,7 +371,7 @@ def compute_hrir(folder=None):
     # impulse response calibration for 0dB
     ir = d_xsweep * i_xsweep
 
-    dbFS_calib = 2 * np.max(np.abs(ir.time))
+    dbFS_calib = 2.38 * np.max(np.abs(ir.time))
 
     #
     # DEBUG ONLY: verify impulse response for ess sweep signal
@@ -398,9 +412,6 @@ def compute_hrir(folder=None):
 
         # this is the measured audio data in response to the ess stimulus
         x = data[:, rx_track_id]
-
-        # max/min
-        x_max = np.max(x)
 
         if _PLOT_SAVE_GRAPH:
             # separate plots in a subfolder
@@ -482,8 +493,15 @@ def compute_hrir(folder=None):
         # using pyfar is actually slower...
         # ir_delay= pf.dsp.find_impulse_response_delay(ir)
 
-        # so going with max correlation in time
-        ir_delay_samples = np.argmax(np.abs(ir.time))
+        # so going with max correlation in time,
+        # since we know the distance we keep a "SAFETY SEARCH WINDOW" in case
+        # we have a non ideal recording environment: the first DIRECT reflection
+        # is travelling at the sound speed, we keep twice the distance
+
+        distance_sound_delay = 2 * (source_position[2] / _SOUND_SPEED)
+
+        # ir_delay_samples = np.argmax( np.abs( ir.time ) )
+        ir_delay_samples = np.argmax(np.abs(ir.time[:, : int(distance_sound_delay * fs)]))
 
         # ir_delay = np.argmax(np.abs(ir.time)) / fs
         ir_delay = ir_delay_samples / fs
@@ -533,10 +551,19 @@ def compute_hrir(folder=None):
         # apply high-pass (8th order) at 20Hz to reject out of band noise
         ir_norm_hipass = pf.dsp.filter.butterworth(ir_norm, 8, f1, "highpass")
 
-        # window to reduce impulse response length
+        # apply window to reduce impulse response length
+        dyn_fade_s = (int((1000 * source_position[2] / _SOUND_SPEED) / 2) + 1) / 1000
+
+        # ir_norm_hipass_window = pf.dsp.time_window(
+        #     ir_norm_hipass,
+        #     [0, _IR_WINDOW_FADEIN_s, _IR_WINDOW_LENGTH_s, (_IR_WINDOW_LENGTH_s + _IR_WINDOW_FADEOUT_s)],
+        #     unit="s",
+        #     crop="window",
+        # )
+
         ir_norm_hipass_window = pf.dsp.time_window(
             ir_norm_hipass,
-            [0, _IR_WINDOW_FADEIN_s, _IR_WINDOW_LENGTH_s, (_IR_WINDOW_LENGTH_s + _IR_WINDOW_FADEOUT_s)],
+            [0, dyn_fade_s, _IR_WINDOW_LENGTH_s, (_IR_WINDOW_LENGTH_s + 2 * dyn_fade_s)],
             unit="s",
             crop="window",
         )
