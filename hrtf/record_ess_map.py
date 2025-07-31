@@ -520,9 +520,15 @@ if __name__ == "__main__":
         distance_current = yaml_params["distance_begin"]
 
         for angle in range(yaml_params["azimuth_begin"], yaml_params["azimuth_end"] + 1, yaml_params["azimuth_step"]):
+            # sanity checks input params:
+
+            # elevation
             elevation_sign = "-"
             if elevation_current > 0:
                 elevation_sign = "+"
+
+            # azimuth
+            angle = angle % 360
 
             yaml_params["measure_name"] = measure_name_bkp + "_+{:03d}{}{:03d}+{:03d}_xAngle".format(
                 angle, elevation_sign, abs(elevation_current), distance_current
