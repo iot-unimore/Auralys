@@ -77,24 +77,24 @@ def signal_handler(sig, frame):
 #
 # COMPUTE FUNCTIONS
 #
-def read_ir_sofa(data=None):
-    sofa = None
-    folder = None
+# def read_ir_sofa(data=None):
+#     sofa = None
+#     folder = None
 
-    try:
-        (sofa, folder) = data
-    except:
-        logger.error("wrong data input")
+#     try:
+#         (sofa, folder) = data
+#     except:
+#         logger.error("wrong data input")
 
-    logger.info("read_ir_sofa: {}".format(folder))
+#     logger.info("read_ir_sofa: {}".format(folder))
 
-    # # add IR data
-    # sofa.Data_IR[0, 0, :] = ir_processed.time[0]
-    # sofa.Data_IR[0, 1, :] = ir_processed.time[0]
+#     # # add IR data
+#     # sofa.Data_IR[0, 0, :] = ir_processed.time[0]
+#     # sofa.Data_IR[0, 1, :] = ir_processed.time[0]
 
-    # sofa.verify()
+#     # sofa.verify()
 
-    # sofa.inspect()
+#     # sofa.inspect()
 
 
 def sum_array(data=None):
@@ -111,6 +111,23 @@ def compute_delay(data=None):
     adata = abs(data)
 
     peak_idx = np.argmax(adata)
+    peak = adata[peak_idx]
+
+    i = peak_idx - 4
+    while (i > 4) and (sum_array(adata[i - 4 : i]) > (peak / 4)):
+        i -= 1
+
+    return i
+
+
+def compute_delay_adj(data=None, idx=0):
+    adata = abs(data)
+
+    peak_idx = idx
+
+    if peak_idx == 0:
+        peak_idx = np.argmax(adata)
+
     peak = adata[peak_idx]
 
     i = peak_idx - 4
@@ -197,15 +214,16 @@ def read_ir_sample(params):
                 sofa_data_ir[i, ii, :] = ir_pyfar["ir_norm_hipass_window"].time[0]
             else:
                 # retrieve info from file processing, 3DTune-In requires zero-delay aligned files!!
-                # ir_info = ir_pyfar["ir_info"]
-                # ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
+                ir_info = ir_pyfar["ir_info"]
+                ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
 
                 # make sure we preserve the peak for the final IR
                 # ir_delay_samples = np.argmax(np.abs(ir_pyfar["ir_norm_hipass_window"].time[0]))
                 # if ir_delay_samples > 4:
                 #     ir_delay_samples -= 4
 
-                ir_delay_samples = compute_delay(ir_pyfar["ir_norm_hipass_window"].time[0])
+                # ir_delay_samples = compute_delay(ir_pyfar["ir_norm_hipass_window"].time[0])
+                ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
 
                 ir_len = ir_pyfar["ir_norm_hipass_window"].n_samples
 
@@ -256,15 +274,16 @@ def read_ir_samples(data=None, configs=None, folders=None, zero_delay=False):
                     data[i, ii, :] = ir_pyfar["ir_norm_hipass_window"].time[0]
                 else:
                     # retrieve info from file processing, 3DTune-In requires zero-delay aligned files!!
-                    # ir_info = ir_pyfar["ir_info"]
-                    # ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
+                    ir_info = ir_pyfar["ir_info"]
+                    ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
 
                     # make sure we preserve the peak for the final IR
                     # ir_delay_samples = np.argmax(np.abs(ir_pyfar["ir_norm_hipass_window"].time[0]))
                     # if ir_delay_samples > 4:
                     #     ir_delay_samples -= 4
 
-                    ir_delay_samples = compute_delay(ir_pyfar["ir_norm_hipass_window"].time[0])
+                    # ir_delay_samples = compute_delay(ir_pyfar["ir_norm_hipass_window"].time[0])
+                    ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
 
                     ir_len = ir_pyfar["ir_norm_hipass_window"].n_samples
 

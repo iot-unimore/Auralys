@@ -1,0 +1,80 @@
+#
+# playback of audio file
+#
+./play_file.py -o hw:2,0 ../pink_noise_30s.wav
+
+#
+# example for single sweep recording from command line
+#
+./record_ess.py -o hw:2,0 -i hw:3,0 -b 20 -e 20000 -a 0.8 -d 10 -r 3 -m ./measures/ -v
+
+#
+# examples for full map (multiple sweeps) recording from command line
+#
+./record_ess_map.py -o hw:2,0 -i hw:3,0 -b 20 -e 20000 -aa 0.8 -d 1 -r 1 -m ./measures/test20240801/ -n test -ab 3 -ae 50 -as 2 -yp ./ess_map_params.yaml -yc ./ess_params.yaml
+./record_ess_map.py -o hw:2,0 -i hw:3,0 -b 20 -e 20000 -a 0.8 -d 1 -r 1 -m ./measures/test20240801/ -n test -z 3 -x 50 -c 2
+./record_ess_map.py -v -yp ./ess_map_params.yaml -ab 0 -ae 2 -m ./measures/test-20240901 -n test
+
+# compute impulse responses on ALL the sweeps recorded under a measure folder
+./compute_hrir.py -mf ./measures/test-20240816_001/ -v
+
+
+#=============================================================================================
+# JAN 2025: full pipeline procedure
+#=============================================================================================
+
+# STEP-1
+# record full map with azimuth 5deg incremental step
+./record_ess_map.py -v -yp ./ess_map_params.yaml -ab 0 -ae 358 -as 15 -m ./measures/dry-20250123_002 -n dry
+
+
+# STEP-2
+# compute impulse responses on ALL recordings in a measure session
+./compute_hrir.py -v -c 44 -mf ./measures/dry-20250123_002
+
+
+# STEP-3 (optional)
+# compute AES69-2022 sofa file for impulse responses
+# this will produce file: ./measures/dry-20250123_002//dry-20250123_002.sofa
+./compute_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/
+# visualize any of the above sofa maps, ALL impulse responses
+./display_sofa.py -v -mf ./measures/dry-20250123_002//dry-20250123_002.sofa
+# visualize any of the above sofa maps, select source position and receiver track
+./display_sofa.py -v -mf ./measures/dry-20250123_002//dry-20250123_002.sofa -sss 270,45,1 -ssr 4
+
+
+# STEP-4
+# split sofa in multiple "FreeField" binaural impulse responses, one sofa file for each
+# configuration of the wilso_prj microphones (binaura, array_six|front|middle|read)
+# compute zero-delay for binaural auralization, use a small ir window to cut reverberations
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s binaural
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s array_six,front
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s array_six,middle
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s array_six,rear
+
+# these 3dti sofa files will be generated
+# ./measures/dry-20250123_002/dry-20250123_002_binaural.sofa
+# ./measures/dry-20250123_002/dry-20250123_002_array_six_front.sofa
+# ./measures/dry-20250123_002/dry-20250123_002_array_six_middle.sofa
+# ./measures/dry-20250123_002/dry-20250123_002_array_six_rear.sofa
+
+# visualize any of the above sofa maps, select source position
+./display_sofa.py -v -mf ./measures/dry-20250123_002//dry-20250123_002_binaural.sofa -sss 270,45,1
+
+
+# STEP-5
+# from mono audio source(s) recreate the full auralization over a set of positions
+# case 01: example for single source with fixed position (60deg left), without room reverberation
+./render_3dti_audio.py -v -sf ./resources/voices/voice_001.wav -hf ./resources/heads/head_002/head_002.yaml -o ./dataset/pippo/ -sc 60,0,1
+# case 02: example for single source with fixed position (60deg left), with reverberation
+./render_3dti_audio.py -sf ./resources/voices/voice_001.wav -hf ./resources/heads/head_002/head_002.yaml -o ./dataset/pippo/ -ef ./resources/rooms/room_brir_001.yaml -sc 60,0,1 -v
+
+
+# STEP-6
+# merge auralized files into one multi-track file
+ffmpeg -i front_left.wav -i front_right.wav -i front_center.wav -i lfe.wav -i back_left.wav -i back_right.wav \
+-filter_complex "[0:a][1:a][2:a][3:a][4:a][5:a]amerge=inputs=6[a]" -map "[a]" output.wav
+
+/usr/bin/ffmpeg -hide_banner -loglevel error -i ./resources/voices/voice_001.wav -i ./dataset/pippo/voice_001_binaural.wav \
+-i ./dataset/pippo/voice_001_array_six_front.wav -i ./dataset/pippo/voice_001_array_six_middle.wav -i ./dataset/pippo/voice_001_array_six_rear.wav \
+ -filter_complex "[0:a][1:a][2:a][3:a][4:a]amerge=inputs=5[a]" -map "[a]" ./dataset/pippo/voice_001_map.wav
