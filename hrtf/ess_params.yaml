@@ -52,7 +52,7 @@ custom:
     units: hertz
     format: wav
     subformat: PCM_24
-    bit_depth: s24be
+    bit_depth: s24le
 
 #
 # general section derived from AES69-2022
