@@ -13,6 +13,7 @@ import logging
 import signal
 import argparse
 import ctypes
+import copy
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -247,11 +248,6 @@ def read_ir_sample(params):
                 ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
 
                 # make sure we preserve the peak for the final IR
-                # ir_delay_samples = np.argmax(np.abs(ir_pyfar["ir_norm_hipass_window"].time[0]))
-                # if ir_delay_samples > 4:
-                #     ir_delay_samples -= 4
-
-                # ir_delay_samples = compute_delay(ir_pyfar["ir_norm_hipass_window"].time[0])
                 ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
 
                 ir_len = ir_pyfar["ir_norm_hipass_window"].n_samples
@@ -785,6 +781,25 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
             folders=measure_folder_list,
             receivers_list=receivers_list,
         )
+
+        #
+        # we always keep the IR delay (i.e. IR peak position)
+        # as a private param
+        AuralysPrjIRPeakDelays = copy.deepcopy(sofa.Data_Delay)
+
+        sofa.add_variable("IRPeakDelay", AuralysPrjIRPeakDelays, dtype="double", dimensions="MR")
+        sofa.add_attribute("GLOBAL_IRPeakDelays", "IR peak delay (samples)")
+
+        # sofa.hdf.create_dataset('GLOBAL_AuralysPrjIRPeakDelays', data=AuralysPrjIRPeakDelays)
+        # sofa.hdf['GLOBAL_AuralysPrjIRPeakDelays'].attrs['Description'] = 'IR peak delay (samples)'
+        # sofa.add_attribute("GLOBAL_AuralysPrjIRPeakDelays",AuralysPrjIRPeakDelays)
+
+        #
+        # if we are not loading IR as "zero-delay" reference we have to
+        # put to zero the Data_Delay or we will introduce a double delay/
+        # when doing the sofa rendering
+        if yaml_params["zero_delay"] == False:
+            sofa.Data_Delay = np.zeros((measures_M, receivers_R))
 
         #
         # audio samples for each position

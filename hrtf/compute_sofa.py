@@ -12,6 +12,7 @@ import yaml
 import logging
 import signal
 import argparse
+import copy
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -662,6 +663,20 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
         (err, samples_ir, samples_ir_window) = read_ir_delays(
             sofa.Data_Delay, measure_audio_config_list, measure_folder_list
         )
+
+        #
+        # we always keep the IR delay (i.e. IR peak position)
+        # as a private param
+        AuralysPrjIRPeakDelays = copy.deepcopy(sofa.Data_Delay)
+        sofa.add_variable("IRPeakDelay", AuralysPrjIRPeakDelays, dtype="double", dimensions="MR")
+        sofa.add_attribute("GLOBAL_IRPeakDelays", "IR peak delay (samples)")
+
+        #
+        # if we are not loading IR as "zero-delay" reference we have to
+        # put to zero the Data_Delay or we will introduce a double delay/
+        # when doing the sofa rendering
+        if yaml_params["zero_delay"] == False:
+            sofa.Data_Delay = np.zeros((measures_M, receivers_R))
 
         # clear audio samples
         sofa.Data_IR = []
