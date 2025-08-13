@@ -46,7 +46,16 @@
 # STEP-4
 # split sofa in multiple "FreeField" binaural impulse responses, one sofa file for each
 # configuration of the wilso_prj microphones (binaura, array_six|front|middle|read)
-# compute zero-delay for binaural auralization, use a small ir window to cut reverberations
+
+# compute non-zero-delay (for 3Dti tool) with small ir window to cut reverberations
+# IR Peak Delays are kept in sofa user variable IRPeakDelay
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -s binaural
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -s array_six,front
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -s array_six,middle
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -s array_six,rear
+
+# compute zero-delay (not for 3Dti tool!), use a small ir window to cut reverberations
+# IR are cut to zero and each delay is written in sofa Data_Delay variable
 ./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s binaural
 ./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s array_six,front
 ./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s array_six,middle
