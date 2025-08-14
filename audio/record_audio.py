@@ -8,7 +8,7 @@ import datetime
 import asyncio
 import yaml
 
-#import numpy as np
+import numpy as np
 import sounddevice as sd
 import soundfile as sf
 import queue
@@ -21,9 +21,6 @@ logger = logging.getLogger(__name__)
 #
 # DEFINES / CONSTANT / GLOBALS
 #
-CONFIG_SYNTAX_NAME = "audio_recording_map"
-CONFIG_SYNTAX_VERSION_MIN = 0.1
-
 AUDIO_CONFIG_SYNTAX_NAME = "audio_recording"
 AUDIO_CONFIG_SYNTAX_VERSION_MIN = 0.1
 
@@ -118,7 +115,7 @@ async def play_silence(
     logger.info("play_silence. done.")
 
 
-async def play_expsweep(
+async def play_audio(
     event=None,
     device=None,
     verbose=False,
@@ -263,7 +260,7 @@ async def record_audio(
     playback_duration=0,
     playback_repeat=1,
     measure_folder="./",
-    measure_name="sweep",
+    measure_name="audio",
     cli=False,
     **kwargs,
 ):
@@ -281,7 +278,7 @@ async def record_audio(
     try:
         try:
             audio_file = sf.SoundFile(
-                measure_folder + "/" + measure_name + "/sweep_" + str(playback_repeat) + ".wav",
+                measure_folder + "/" + measure_name + "/audio_" + str(playback_repeat) + ".wav",
                 mode="w",
                 samplerate=96000,
                 channels=22,
@@ -348,34 +345,38 @@ async def playrecord(cli=False, **kwargs):
     )
     await event.wait()
 
-    for r in range(kwargs["playback_repeat"]):
-        event.clear()
+    for voice in kwargs["verseVoicesPlayList"]:
 
-        asyncio.gather(
-            record_audio(
-                event=event,
-                device=kwargs["input_device"],
-                playback_repeat=r,
-                measure_folder=kwargs["measure_folder"],
-                measure_name=kwargs["measure_name"],
-                cli=cli,
-            ),
-            play_expsweep(
-                event=event,
-                verbose=kwargs["verbose"],
-                device=kwargs["output_device"],
-                playback_amplitude=kwargs["playback_amplitude"],
-                samplerate=kwargs["samplerate"],
-                frequency_begin=kwargs["frequency_begin"],
-                frequency_end=kwargs["frequency_end"],
-                playback_duration=kwargs["playback_duration"],
-                playback_postpadding=kwargs["playback_postpadding"],
-                playback_prepadding=kwargs["playback_prepadding"],
-                cli=cli,
-            ),
-        )
+        logger.error(f"PLAY NOW:{voice[0]}/{voice[1]}")
 
-        await event.wait()
+        # for r in range(kwargs["playback_repeat"]):
+        #     event.clear()
+
+        #     asyncio.gather(
+        #         record_audio(
+        #             event=event,
+        #             device=kwargs["input_device"],
+        #             playback_repeat=r,
+        #             measure_folder=kwargs["measure_folder"],
+        #             measure_name=kwargs["measure_name"],
+        #             cli=cli,
+        #         ),
+        #         play_audio(
+        #             event=event,
+        #             verbose=kwargs["verbose"],
+        #             device=kwargs["output_device"],
+        #             playback_amplitude=kwargs["playback_amplitude"],
+        #             samplerate=kwargs["samplerate"],
+        #             frequency_begin=kwargs["frequency_begin"],
+        #             frequency_end=kwargs["frequency_end"],
+        #             playback_duration=kwargs["playback_duration"],
+        #             playback_postpadding=kwargs["playback_postpadding"],
+        #             playback_prepadding=kwargs["playback_prepadding"],
+        #             cli=cli,
+        #         ),
+        #     )
+
+        #     await event.wait()
 
 
 def run_main(**kwargs):
@@ -395,10 +396,6 @@ def run_main(**kwargs):
         audio_config["custom"]["stimulus"]["voice"]["amplitude"]["value"] = kwargs["playback_amplitude"]
         audio_config["custom"]["stimulus"]["voice"]["repeat"]["value"] = kwargs["playback_repeat"]
 
-        # audio_config["custom"]["stimulus"]["sweep"]["duration"]["value"] = kwargs["playback_duration"]
-        # audio_config["custom"]["stimulus"]["sweep"]["frequency"]["begin"] = kwargs["frequency_begin"]
-        # audio_config["custom"]["stimulus"]["sweep"]["frequency"]["end"] = kwargs["frequency_end"]
-        # audio_config["custom"]["stimulus"]["sweep"]["frequency"]["units"] = "hertz"
         audio_config["custom"]["stimulus"]["voice"]["padding"]["pre"]["beep"] = 0
         audio_config["custom"]["stimulus"]["voice"]["padding"]["pre"]["value"] = kwargs["playback_prepadding"]
         audio_config["custom"]["stimulus"]["voice"]["padding"]["post"]["beep"] = 0
@@ -418,6 +415,16 @@ def run_main(**kwargs):
         # update general section
         audio_config["general"]["date_modified"] = datetime.date.today()
 
+        # add versePlaybackList
+        audio_config["verseVoicesPlayList"]={}
+        idx=0
+        for voice in kwargs["verseVoicesPlayList"]:
+            audio_config["verseVoicesPlayList"][idx]={}
+            audio_config["verseVoicesPlayList"][idx]["type"]="voice"
+            audio_config["verseVoicesPlayList"][idx]["subtype"]=voice[0]
+            audio_config["verseVoicesPlayList"][idx]["info"]=voice[1]
+            idx+=1
+
         # write output config
         try:
             os.makedirs(kwargs["measure_folder"] + "/" + kwargs["measure_name"] + "/", exist_ok=True)
@@ -432,6 +439,15 @@ def run_main(**kwargs):
             "\n[ERROR] cannot write yaml config file: {}".format(
                 kwargs["measure_folder"] + "/" + kwargs["measure_name"] + "/config.yaml"
             )
+        )
+
+    # prepare audio recording folders
+    try:
+        for voice in kwargs["verseVoicesPlayList"]:
+             os.makedirs(kwargs["measure_folder"] + "/" + kwargs["measure_name"] + "/" + voice[0] + "/" +voice[1])
+    except:
+        sys.exit(
+            "\n[ERROR] cannot create rcordings output folders."
         )
 
     # uncomment this line to run audio recording
@@ -485,7 +501,7 @@ if __name__ == "__main__":
         "-n",
         "--measure_name",
         type=str,
-        default="sweep",
+        default="audio",
         help="measure output name (default: %(default)s)",
     )
 
@@ -527,11 +543,11 @@ if __name__ == "__main__":
         #
 
         # stimulus
-        audio_config["custom"]["stimulus"]["audio"]["padding"]["pre"]["beep"] = 0
-        audio_config["custom"]["stimulus"]["audio"]["padding"]["pre"]["value"] = args.playback_prepadding
-        audio_config["custom"]["stimulus"]["audio"]["padding"]["post"]["beep"] = 0
-        audio_config["custom"]["stimulus"]["audio"]["padding"]["post"]["value"] = args.playback_postpadding
-        audio_config["custom"]["stimulus"]["audio"]["amplitude"]["value"] = args.playback_amplitude
+        audio_config["custom"]["stimulus"]["voice"]["padding"]["pre"]["beep"] = 0
+        audio_config["custom"]["stimulus"]["voice"]["padding"]["pre"]["value"] = args.playback_prepadding
+        audio_config["custom"]["stimulus"]["voice"]["padding"]["post"]["beep"] = 0
+        audio_config["custom"]["stimulus"]["voice"]["padding"]["post"]["value"] = args.playback_postpadding
+        audio_config["custom"]["stimulus"]["voice"]["amplitude"]["value"] = args.playback_amplitude
 
         # audio recording
         audio_config["custom"]["recording"]["samplerate"] = args.samplerate

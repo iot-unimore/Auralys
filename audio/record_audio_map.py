@@ -13,7 +13,7 @@ import time
 import math
 import os
 
-import record_ess
+import record_audio
 
 import numpy as np
 import sounddevice as sd
@@ -23,6 +23,29 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+#
+# DEFINES / CONSTANT / GLOBALS
+#
+_ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
+_CMD_DIR = os.path.join(_ROOT_DIR, "../hrtf")
+_AURALIS_DIR = os.path.join(_ROOT_DIR,"../auralysSpeaker")
+_HRTF_DIR = os.path.join(_ROOT_DIR,"../hrtf")
+_AUDIO_DIR = os.path.join(_ROOT_DIR,"../audio")
+
+
+CONFIG_SYNTAX_NAME = "audio_recording_map"
+CONFIG_SYNTAX_VERSION_MIN = 0.1
+
+AUDIO_CONFIG_SYNTAX_NAME = "audio_recording"
+AUDIO_CONFIG_SYNTAX_VERSION_MIN = 0.1
+AUDIO_CONFIG_COORD_ROUND_DECIMALS = 9
+
+
+
+########################################################################################################################
+#  DO NOT MODIFY CODE BELOW THIS LINE
+########################################################################################################################
+
 def int_or_str(text):
     """Helper function for argument parsing."""
     try:
@@ -31,27 +54,12 @@ def int_or_str(text):
         return text
 
 
-#
-# DEFINES / CONSTANT / GLOBALS
-#
-_ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
-_CMD_DIR = os.path.join(_ROOT_DIR, "../hrtf/")
-
-
-CONFIG_SYNTAX_NAME = "audio_measure_map"
-CONFIG_SYNTAX_VERSION_MIN = 0.1
-
-ESS_CONFIG_SYNTAX_NAME = "audio_measure"
-ESS_CONFIG_SYNTAX_VERSION_MIN = 0.1
-ESS_CONFIG_COORD_ROUND_DECIMALS = 9
-
-
-def update_ess_yaml_params(yaml_params=[], azimuth=0, elevation=0, distance=1):
+def update_audio_yaml_params(yaml_params=[], azimuth=0, elevation=0, distance=1):
     result = {}
     result["error"] = 0
 
     # check: config file sintax name version
-    if yaml_params["syntax"]["name"] != ESS_CONFIG_SYNTAX_NAME:
+    if yaml_params["syntax"]["name"] != AUDIO_CONFIG_SYNTAX_NAME:
         result["error"] = -1
 
     #
@@ -78,13 +86,13 @@ def update_ess_yaml_params(yaml_params=[], azimuth=0, elevation=0, distance=1):
         yaml_params["setup"]["sources"][0]["position"]["coord"]["units"] = ["meter"]
         x = round(
             distance * math.cos(math.pi / 180 * (elevation % 360)) * math.cos(math.pi / 180 * (azimuth % 360)),
-            ESS_CONFIG_COORD_ROUND_DECIMALS,
+            AUDIO_CONFIG_COORD_ROUND_DECIMALS,
         )
         y = round(
             distance * math.cos(math.pi / 180 * (elevation % 360)) * math.sin(math.pi / 180 * (azimuth % 360)),
-            ESS_CONFIG_COORD_ROUND_DECIMALS,
+            AUDIO_CONFIG_COORD_ROUND_DECIMALS,
         )
-        z = round(distance * math.sin(math.pi / 180 * (elevation % 360)), ESS_CONFIG_COORD_ROUND_DECIMALS)
+        z = round(distance * math.sin(math.pi / 180 * (elevation % 360)), AUDIO_CONFIG_COORD_ROUND_DECIMALS)
         yaml_params["setup"]["sources"][0]["position"]["coord"]["value"] = [x, y, z]
     else:
         yaml_params["setup"]["sources"][0]["position"]["coord"]["type"] = "spherical"
@@ -102,24 +110,24 @@ def update_ess_yaml_params(yaml_params=[], azimuth=0, elevation=0, distance=1):
 
     x = round(
         math.cos(math.pi / 180 * ((180 + azimuth) % 360)) * math.cos(math.pi / 180 * (elevation % 360)),
-        ESS_CONFIG_COORD_ROUND_DECIMALS,
+        AUDIO_CONFIG_COORD_ROUND_DECIMALS,
     )
     y = round(
         math.sin(math.pi / 180 * ((180 + azimuth) % 360)) * math.cos(math.pi / 180 * (elevation % 360)),
-        ESS_CONFIG_COORD_ROUND_DECIMALS,
+        AUDIO_CONFIG_COORD_ROUND_DECIMALS,
     )
-    z = round(math.sin(math.pi / 180 * (elevation % 360)), ESS_CONFIG_COORD_ROUND_DECIMALS)
+    z = round(math.sin(math.pi / 180 * (elevation % 360)), AUDIO_CONFIG_COORD_ROUND_DECIMALS)
     yaml_params["setup"]["sources"][0]["position"]["view_vect"]["value"] = [x, y, z]
 
     x = round(
         math.sin(math.pi / 180 * ((180 + azimuth) % 360)) * math.sin(math.pi / 180 * (elevation % 360)),
-        ESS_CONFIG_COORD_ROUND_DECIMALS,
+        AUDIO_CONFIG_COORD_ROUND_DECIMALS,
     )
     y = round(
         math.cos(math.pi / 180 * ((180 + azimuth) % 360)) * math.sin(math.pi / 180 * (elevation % 360)),
-        ESS_CONFIG_COORD_ROUND_DECIMALS,
+        AUDIO_CONFIG_COORD_ROUND_DECIMALS,
     )
-    z = round(math.cos(math.pi / 180 * (elevation % 360)), ESS_CONFIG_COORD_ROUND_DECIMALS)
+    z = round(math.cos(math.pi / 180 * (elevation % 360)), AUDIO_CONFIG_COORD_ROUND_DECIMALS)
     yaml_params["setup"]["sources"][0]["position"]["up_vect"]["value"] = [x, y, z]
 
     # update emitter(s) position of the above source
@@ -179,11 +187,11 @@ if __name__ == "__main__":
             "-r",
             "--repeat",
             type=int,
-            help="sweep repetitions",
+            help="audio repetitions",
         )
         parser.add_argument(
             "-yc",
-            "--ess_yaml_config",
+            "--audio_yaml_config",
             type=str,
             help="yaml config file",
         )
@@ -276,14 +284,14 @@ if __name__ == "__main__":
             "--repeat",
             type=int,
             default=1,
-            help="sweep repetitions (default: %(default)s)",
+            help="audio repetitions (default: %(default)s)",
         )
         parser.add_argument(
             "-yc",
-            "--ess_yaml_config",
+            "--audio_yaml_config",
             type=str,
-            default="./ess_params.yaml",
-            help="yaml config file for audio sweep recording (default: %(default)s)",
+            default="./audio_params.yaml",
+            help="yaml config file for audio audio recording (default: %(default)s)",
         )
         parser.add_argument(
             "-m",
@@ -296,7 +304,7 @@ if __name__ == "__main__":
             "-n",
             "--measure_name",
             type=str,
-            default="ess_measure",
+            default="audio_measure",
             help="measure output name (default: %(default)s)",
         )
         parser.add_argument(
@@ -412,7 +420,7 @@ if __name__ == "__main__":
             yaml_params["syntax"]["version"]["major"] + yaml_params["syntax"]["version"]["minor"] / 10
         ):
             sys.exit(
-                "\n[ERROR] invalid syntax version ({}) for map yaml config file, expected:{}".format(
+                "\n[ERROR] invalid syntax version ({}) for MAP yaml config file, expected:{}".format(
                     (yaml_params["syntax"]["version"]["major"] + yaml_params["syntax"]["version"]["minor"] / 10),
                     CONFIG_SYNTAX_VERSION_MIN,
                 )
@@ -446,29 +454,29 @@ if __name__ == "__main__":
     if (yaml_params["input_device"] == None) or (yaml_params["output_device"] == None):
         sys.exit("\n[ERROR] invalid input/output device, see help for details.")
 
-    # audio config file for sweep recording is mandatory
-    ess_yaml_params = []
-    if yaml_params["ess_yaml_config"] != None:
+    # audio config file for voice recording is mandatory
+    audio_yaml_params = []
+    if yaml_params["audio_yaml_config"] != None:
         try:
-            with open(yaml_params["ess_yaml_config"], "r") as file:
-                ess_yaml_params = yaml.safe_load(file)
+            with open(yaml_params["audio_yaml_config"], "r") as file:
+                audio_yaml_params = yaml.safe_load(file)
         except:
             sys.exit(
-                "\n[ERROR] cannot open/parse audio ESS yaml config file: {}".format(yaml_params["ess_yaml_config"])
+                "\n[ERROR] cannot open/parse audio audio yaml config file: {}".format(yaml_params["audio_yaml_config"])
             )
 
         # check: config file sintax name version
-        if ess_yaml_params["syntax"]["name"] != ESS_CONFIG_SYNTAX_NAME:
+        if audio_yaml_params["syntax"]["name"] != AUDIO_CONFIG_SYNTAX_NAME:
             sys.exit(
-                "\n[ERROR] invalid syntax name for ESS yaml config file: expected [{}] got [{}]".format(
-                    ESS_CONFIG_SYNTAX_NAME, ess_yaml_params["syntax"]["name"]
+                "\n[ERROR] invalid syntax name for audio yaml config file: expected [{}] got [{}]".format(
+                    AUDIO_CONFIG_SYNTAX_NAME, audio_yaml_params["syntax"]["name"]
                 )
             )
     else:
-        sys.exit("\n[ERROR] missing audio ESS yaml config file.")
+        sys.exit("\n[ERROR] missing audio audio yaml config file.")
 
     #
-    # run measure loop for audio sweep recording
+    # run measure loop for audio voice recording
     #
     try:
         measure_name_bkp = yaml_params["measure_name"]
@@ -496,22 +504,22 @@ if __name__ == "__main__":
             )
 
             logger.info("-" * 80)
-            logger.info("ESS MAP: {}".format(yaml_params["measure_name"]))
+            logger.info("audio MAP: {}".format(yaml_params["measure_name"]))
 
             #
-            # based on azimuth/elevation and distance we have to generate a proper ESS config file
-            # we use a temporary file location since it is passed to the record_ess procedure which
+            # based on azimuth/elevation and distance we have to generate a proper audio config file
+            # we use a temporary file location since it is passed to the record_audio procedure which
             # will save the final config file into the audio recording folder
             #
             # We use convention "SingleRoomSRIR" where the Listener is placed into the origin position [0,0,0]
             #
-            result = update_ess_yaml_params(
-                yaml_params=ess_yaml_params, azimuth=angle, elevation=elevation_current, distance=distance_current
+            result = update_audio_yaml_params(
+                yaml_params=audio_yaml_params, azimuth=angle, elevation=elevation_current, distance=distance_current
             )
 
-            with open("/tmp/ess_params_000000.yaml", "w") as file:
-                yaml.dump(ess_yaml_params, file)
-                yaml_params["ess_yaml_config"] = "/tmp/ess_params_000000.yaml"
+            with open("/tmp/audio_params_000000.yaml", "w") as file:
+                yaml.dump(audio_yaml_params, file)
+                yaml_params["audio_yaml_config"] = "/tmp/audio_params_000000.yaml"
 
             #
             # run audio recording
@@ -525,36 +533,37 @@ if __name__ == "__main__":
                 angle_adj = (360 - int(angle)) % 360
 
             # debug only:
-            # if result["error"] == 0:
-            #     # time.sleep(1)
-            #     record_ess.run_main(**yaml_params)
-            # else:
-            #     logger.error("[ERROR]: cannot set rotating table position, angle={}".format(angle_adj))
-
-            # rotate table
-            rv = subprocess.run(
-                [_CMD_DIR + "/cmd_set_position.sh", str(angle_adj)], stdout=subprocess.PIPE
-            ).stdout.decode("utf-8")
-            result = json.loads(rv)
-
             if result["error"] == 0:
-                rv = subprocess.run([_CMD_DIR + "/cmd_get_position.sh"], stdout=subprocess.PIPE).stdout.decode("utf-8")
-                result = json.loads(rv)
-
-                while result["position"] != angle_adj:
-                    time.sleep(3)
-                    rv = subprocess.run([_CMD_DIR + "/cmd_get_position.sh"], stdout=subprocess.PIPE).stdout.decode(
-                        "utf-8"
-                    )
-                    result = json.loads(rv)
-
-                # rotating table position is now set: sleep 1s and start recording
                 time.sleep(1)
-
-                if not (yaml_params["test"]):
-                    record_ess.run_main(**yaml_params)
+                record_audio.run_main(**yaml_params)
             else:
                 logger.error("[ERROR]: cannot set rotating table position, angle={}".format(angle_adj))
+
+            if(0):
+                # rotate table
+                rv = subprocess.run(
+                    [_CMD_DIR + "/cmd_set_position.sh", str(angle_adj)], stdout=subprocess.PIPE
+                ).stdout.decode("utf-8")
+                result = json.loads(rv)
+
+                if result["error"] == 0:
+                    rv = subprocess.run([_CMD_DIR + "/cmd_get_position.sh"], stdout=subprocess.PIPE).stdout.decode("utf-8")
+                    result = json.loads(rv)
+
+                    while result["position"] != angle_adj:
+                        time.sleep(3)
+                        rv = subprocess.run([_CMD_DIR + "/cmd_get_position.sh"], stdout=subprocess.PIPE).stdout.decode(
+                            "utf-8"
+                        )
+                        result = json.loads(rv)
+
+                    # rotating table position is now set: sleep 1s and start recording
+                    time.sleep(1)
+
+                    if not (yaml_params["test"]):
+                        record_audio.run_main(**yaml_params)
+                else:
+                    logger.error("[ERROR]: cannot set rotating table position, angle={}".format(angle_adj))
 
     except KeyboardInterrupt:
         sys.exit("\nInterrupted by user")
