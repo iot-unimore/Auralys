@@ -13,12 +13,31 @@ import os
 
 logger = logging.getLogger(__name__)
 
+#
+# DEFINES / CONSTANT / GLOBALS
+#
+_ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
+_CMD_DIR = os.path.join(_ROOT_DIR, "./hrtf")
+_AURALIS_DIR = os.path.join(_ROOT_DIR,"./auralysSpeaker")
+_HRTF_DIR = os.path.join(_ROOT_DIR,"./hrtf")
+_AUDIO_DIR = os.path.join(_ROOT_DIR,"./audio")
 
 # Use alternating pattern for AZIMUTH position
 _AZIMUT_BEGIN = 360
 _AZIMUT_END = 1
 _AZIMUT_STEP = -10
 _USE_ALTERNATE_AZIMUTH = True
+
+# AUDIO CARD USB IDs
+_AUDIO_RECORDING_DEVICE_ID = "Fireface UFX (23703154)"
+_AUDIO_PLAYBACK_DEVICE_ID = "Scarlett 2i2 USB"
+
+#
+# EXECUTABLES / EXTERNAL CMDs
+#
+_FFMPEG_EXE = "/usr/bin/ffmpeg"
+_FFPROBE_EXE = "/usr/bin/ffprobe"
+_APLAY_EXE = "/usr/bin/aplay"
 
 # Define a Speaker 3D Position Table with 3 columns [azimuth, X, Z] (Y=0) and 10 rows (i.e. 10 positions)
 auralysPositions = [
@@ -49,32 +68,32 @@ def find_audio_card():
 
     # search for RECORDING card
     try:
-        rv = subprocess.check_output(['aplay -l | grep "Fireface UFX (23703154)"'], shell=True)
+        rv = subprocess.check_output([_APLAY_EXE+' -l | grep "'+_AUDIO_RECORDING_DEVICE_ID+'"'], shell=True)
         if "card" in rv.decode():
             audio_recording_hw_idx = (rv.decode().split(":"))[0]
             audio_recording_hw_idx = (audio_recording_hw_idx.split(" "))[1]
             print(audio_recording_hw_idx)
         else:
-            print("ERROR: cannot find recording audio card Fireface UFX (23703154), exit.")
+            print(f"ERROR: cannot find recording audio card {_AUDIO_RECORDING_DEVICE_ID}, exit.")
             exit(0)
     except:
-        print("ERROR: cannot find recording audio card Fireface UFX (23703154), exit.")
+        print(f"ERROR: cannot find recording audio card {_AUDIO_RECORDING_DEVICE_ID}, exit.")
         exit(1)
 
     # search for PLAYBACK card
     try:
-        rv = subprocess.check_output(['aplay -l | grep "Scarlett 2i2 USB"'], shell=True)
+        rv = subprocess.check_output([_APLAY_EXE+' -l | grep "'+_AUDIO_PLAYBACK_DEVICE_ID+'"'], shell=True)
         if "card" in rv.decode():
             audio_playback_hw_idx = (rv.decode().split(":"))[0]
             audio_playback_hw_idx = (audio_playback_hw_idx.split(" "))[1]
             print(audio_playback_hw_idx)
         else:
-            print("ERROR: cannot find recording audio card Scarlett 2i2 USB, exit.")
+            print(f"ERROR: cannot find recording audio card {_AUDIO_PLAYBACK_DEVICE_ID}, exit.")
             exit(0)
     except:
-        print("ERROR: cannot find recording audio card Scarlett 2i2 USB, exit.")
+        print(f"ERROR: cannot find recording audio card {_AUDIO_PLAYBACK_DEVICE_ID}, exit.")
         exit(0)
-        
+
     return [audio_recording_hw_idx, audio_playback_hw_idx]
 
 
