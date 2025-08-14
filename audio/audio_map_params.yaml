@@ -13,13 +13,15 @@ syntax:
     revision: 0
 
 # audio playlist config file
-audio_yaml_config: ./ess_params.yaml
+audio_yaml_config: ./audio_params.yaml
 
 # audio recording format params
 samplerate: 96000
 audio_format: PCM_24
 
-# audio sweep playback params
+# audio playback params
+playback_prepadding: 2
+playback_postpadding: 2
 playback_repeat: 1
 playback_amplitude: 0.8
 
