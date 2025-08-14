@@ -28,8 +28,22 @@ _AZIMUT_BEGIN = 360
 _AZIMUT_END = 1
 _AZIMUT_STEP = -10
 
+_AUDIO_MAP_CFG_NAME="audio_map_params"
+_AUDIO_CFG_NAME="audio_params"
+
 # Use alternating pattern for AZIMUTH position
 _USE_ALTERNATE_AZIMUTH = True
+
+# AUDIO CARD USB IDs
+_AUDIO_RECORDING_DEVICE_ID = "Fireface UFX (23703154)"
+_AUDIO_PLAYBACK_DEVICE_ID = "Scarlett 2i2 USB"
+
+#
+# EXECUTABLES / EXTERNAL CMDs
+#
+_FFMPEG_EXE = "/usr/bin/ffmpeg"
+_FFPROBE_EXE = "/usr/bin/ffprobe"
+_APLAY_EXE = "/usr/bin/aplay"
 
 
 # Define a Speaker 3D Position Table with 3 columns [azimuth, X, Z] (Y=0) and 10 rows (i.e. 10 positions)
@@ -69,23 +83,31 @@ def find_audio_card():
     audio_playback_hw_idx = 0
 
     # search for RECORDING card
-    rv = subprocess.check_output(['aplay -l | grep "Fireface UFX (23703154)"'], shell=True)
-    if "card" in rv.decode():
-        audio_recording_hw_idx = (rv.decode().split(":"))[0]
-        audio_recording_hw_idx = (audio_recording_hw_idx.split(" "))[1]
-        print(audio_recording_hw_idx)
-    else:
-        print("ERROR: cannot find recording audio card Fireface UFX (23703154), exit.")
-        exit(0)
+    try:
+        rv = subprocess.check_output([_APLAY_EXE+' -l | grep "'+_AUDIO_RECORDING_DEVICE_ID+'"'], shell=True)
+        if "card" in rv.decode():
+            audio_recording_hw_idx = (rv.decode().split(":"))[0]
+            audio_recording_hw_idx = (audio_recording_hw_idx.split(" "))[1]
+            # print(audio_recording_hw_idx)
+        else:
+            print(f"ERROR: cannot find recording audio card {_AUDIO_RECORDING_DEVICE_ID}, exit.")
+            exit(0)
+    except:
+        print(f"ERROR: cannot find recording audio card {_AUDIO_RECORDING_DEVICE_ID}, exit.")
+        exit(1)
 
     # search for PLAYBACK card
-    rv = subprocess.check_output(['aplay -l | grep "Scarlett 2i2 USB"'], shell=True)
-    if "card" in rv.decode():
-        audio_playback_hw_idx = (rv.decode().split(":"))[0]
-        audio_playback_hw_idx = (audio_playback_hw_idx.split(" "))[1]
-        print(audio_playback_hw_idx)
-    else:
-        print("ERROR: cannot find recording audio card Scarlett 2i2 USB, exit.")
+    try:
+        rv = subprocess.check_output([_APLAY_EXE+' -l | grep "'+_AUDIO_PLAYBACK_DEVICE_ID+'"'], shell=True)
+        if "card" in rv.decode():
+            audio_playback_hw_idx = (rv.decode().split(":"))[0]
+            audio_playback_hw_idx = (audio_playback_hw_idx.split(" "))[1]
+            print(audio_playback_hw_idx)
+        else:
+            print(f"ERROR: cannot find recording audio card {_AUDIO_PLAYBACK_DEVICE_ID}, exit.")
+            exit(0)
+    except:
+        print(f"ERROR: cannot find recording audio card {_AUDIO_PLAYBACK_DEVICE_ID}, exit.")
         exit(0)
 
     return [audio_recording_hw_idx, audio_playback_hw_idx]
@@ -162,7 +184,7 @@ if __name__ == "__main__":
         print("==============================================================")
 
         # move speaker in position
-        rv = subprocess.run([_AURALIS_DIR+"/auralysSpeaker/cli/auralys_ctrl.py","-c","set","position","-p",str(position),"-rs",str(-1 * int(row[0])),"-t","ac","-v",],stdout=subprocess.PIPE).stdout.decode("utf-8")
+#        rv = subprocess.run([_AURALIS_DIR+"/auralysSpeaker/cli/auralys_ctrl.py","-c","set","position","-p",str(position),"-rs",str(-1 * int(row[0])),"-t","ac","-v",],stdout=subprocess.PIPE).stdout.decode("utf-8")
 
         # wait for stabilization of the speaker
         time.sleep(3)
@@ -186,7 +208,7 @@ if __name__ == "__main__":
         # update params for new elevation
         #
         update_audio_map_params(
-            _AUDIO_DIR+"/audio_map_params.yaml", "/tmp/audio_map_params.yaml", str(row[0]), str(row[0]), hw_rec_idx, hw_play_idx
+            _AUDIO_DIR+"/"+_AUDIO_MAP_CFG_NAME+".yaml", "/tmp/"+_AUDIO_MAP_CFG_NAME+".yaml", str(row[0]), str(row[0]), hw_rec_idx, hw_play_idx
         )
 
         #
@@ -201,9 +223,9 @@ if __name__ == "__main__":
                 _AUDIO_DIR+"/record_audio_map.py",
                 "-v",
                 "-yp",
-                "/tmp/ess_map_params.yaml",
+                "/tmp/"+_AUDIO_MAP_CFG_NAME+".yaml",
                 "-yc",
-                "./hrtf/ess_params.yaml",
+                _AUDIO_DIR+"/"+_AUDIO_CFG_NAME+".yaml",
                 "-ab",
                 str(azimuth_begin),
                 "-ae",
@@ -222,4 +244,4 @@ if __name__ == "__main__":
     time.sleep(3)
 
     # back to zero position: speaker & table
-    rv = subprocess.run([_AURALIS_DIR+"/cli/auralys_ctrl.py", "-c", "cmd", "gozero", "-rs", "0", "-rt", "0", "-v"],stdout=subprocess.PIPE).stdout.decode("utf-8")
+#    rv = subprocess.run([_AURALIS_DIR+"/cli/auralys_ctrl.py", "-c", "cmd", "gozero", "-rs", "0", "-rt", "0", "-v"],stdout=subprocess.PIPE).stdout.decode("utf-8")
