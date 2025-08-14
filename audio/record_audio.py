@@ -114,8 +114,8 @@ def extract_track(audio_in, track_num, audio_out):
     cmd = [
         _FFMPEG_EXE, "-y",              # overwrite without asking
         "-i", audio_in,                 # input file
-        "-map", f"0:{track_num}",       # select track number
-        "-acodec", "copy",              # keep audio format
+        "-map_channel", f"0.0.{track_num}",       # select track number
+        "-acodec", "pcm_s24le",      # uncompressed PCM 24-bit
         audio_out
     ]
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -130,64 +130,67 @@ def audiomux_wav_to_mkv(file_path=None, file_name=None, mux_pattern=[2,[14,15],[
     # load file
     in_filename = os.path.join(file_path, file_name+".wav")
 
-    data_info =getMediaInfo(in_filename)
+    data_info =getMediaInfo(in_filename, print_result=False)
 
     logger.info("DE-MUXING {}".format(in_filename))
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        for idx in np.arange(data_info["streams"][0]["channels"]):
-            out_filename=os.path.join(tmpdir, file_name+"_"+str(idx) )
+        #for idx in np.arange(data_info["streams"][0]["channels"]):
+        for idx in [2,14,15,16,17,18,19,20,21]:
+
+            out_filename=os.path.join(tmpdir, file_name+"_"+str(idx)+".wav"  )
             logger.info("EXTRACT {} TO: {}".format(idx,out_filename))
             extract_track(audio_in=in_filename, track_num=idx, audio_out=out_filename)
 
-        #
+        # #######################################################################
         # ToDo: remove this hardcoded muxing patter and use the input mux_pattern
-        #
+        # #######################################################################
+
         in_filename = os.path.join(file_path, file_name+".mkv")
 
         logger.info("MUXING {}".format(in_filename))
 
         # mono-to-stereo :binaural
-        file_L=os.path.join(tmpdir, file_name+"_"+str(14))
-        file_R=os.path.join(tmpdir, file_name+"_"+str(15))
-        file_out=os.path.join(tmpdir, file_name+"_binaural")
-        cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex \"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"",str(file_out)," > /dev/null 2>&1"]
+        file_L=os.path.join(tmpdir, file_name+"_"+str(14))+".wav"
+        file_R=os.path.join(tmpdir, file_name+"_"+str(15))+".wav"
+        file_out=os.path.join(tmpdir, file_name+"_binaural.wav")
+        cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex","\"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"","-acodec","pcm_s24le",str(file_out)," > /dev/null 2>&1"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        # os.system(" ".join(cmd))
+        os.system(" ".join(cmd))
 
         # mono-to-stereo :array_six_front
-        file_L=os.path.join(tmpdir, file_name+"_"+str(16))
-        file_R=os.path.join(tmpdir, file_name+"_"+str(17))
-        file_out=os.path.join(tmpdir, file_name+"_array_six_front")
-        cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex \"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"",str(file_out)," > /dev/null 2>&1"]
+        file_L=os.path.join(tmpdir, file_name+"_"+str(16))+".wav"
+        file_R=os.path.join(tmpdir, file_name+"_"+str(17))+".wav"
+        file_out=os.path.join(tmpdir, file_name+"_array_six_front.wav")
+        cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex","\"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"","-acodec","pcm_s24le",str(file_out)," > /dev/null 2>&1"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)        
-        # os.system(" ".join(cmd))
+        os.system(" ".join(cmd))
 
         # mono-to-stereo :array_six_middle
-        file_L=os.path.join(tmpdir, file_name+"_"+str(18))
-        file_R=os.path.join(tmpdir, file_name+"_"+str(19))
-        file_out=os.path.join(tmpdir, file_name+"_array_six_middle")
-        cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex \"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"",str(file_out)," > /dev/null 2>&1"]
+        file_L=os.path.join(tmpdir, file_name+"_"+str(18))+".wav"
+        file_R=os.path.join(tmpdir, file_name+"_"+str(19))+".wav"
+        file_out=os.path.join(tmpdir, file_name+"_array_six_middle.wav")
+        cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex","\"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"","-acodec","pcm_s24le",str(file_out)," > /dev/null 2>&1"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)        
-        # os.system(" ".join(cmd))
+        os.system(" ".join(cmd))
 
         # mono-to-stereo :array_six_rear
-        file_L=os.path.join(tmpdir, file_name+"_"+str(20))
-        file_R=os.path.join(tmpdir, file_name+"_"+str(21))
-        file_out=os.path.join(tmpdir, file_name+"_array_six_rear")
-        cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex \"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"",str(file_out)," > /dev/null 2>&1"]
+        file_L=os.path.join(tmpdir, file_name+"_"+str(20))+".wav"
+        file_R=os.path.join(tmpdir, file_name+"_"+str(21))+".wav"
+        file_out=os.path.join(tmpdir, file_name+"_array_six_rear.wav")
+        cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex","\"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"","-acodec","pcm_s24le",str(file_out)," > /dev/null 2>&1"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)        
-        # os.system(" ".join(cmd))
+        os.system(" ".join(cmd))
 
         logger.info("MUXING MKV {}".format(in_filename))
-        file_in=os.path.join(tmpdir, file_name+"_"+str(2))
+        file_in=os.path.join(tmpdir, file_name+"_"+str(2)+".wav")
         file_out= os.path.join(file_path, file_name+".mkv")
         cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats",
             "-i", str(file_in),
-            "-i",str(os.path.join(tmpdir, file_name+"_binaural")),
-            "-i",str(os.path.join(tmpdir, file_name+"_array_six_front")),
-            "-i",str(os.path.join(tmpdir, file_name+"_array_six_middle")),
-            "-i",str(os.path.join(tmpdir, file_name+"_array_six_rear")),
+            "-i",str(os.path.join(tmpdir, file_name+"_binaural.wav")),
+            "-i",str(os.path.join(tmpdir, file_name+"_array_six_front.wav")),
+            "-i",str(os.path.join(tmpdir, file_name+"_array_six_middle.wav")),
+            "-i",str(os.path.join(tmpdir, file_name+"_array_six_rear.wav")),
             "-map","0:a",
             "-map","1:a",
             "-map","2:a",
@@ -200,7 +203,7 @@ def audiomux_wav_to_mkv(file_path=None, file_name=None, mux_pattern=[2,[14,15],[
             "-metadata:s:a:5","title=\"array_six_rear\"",
             "-movflags",
             "+faststart",
-            "-acodec copy",
+            "-acodec","copy",
             str(file_out)
         ]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)        
@@ -211,6 +214,7 @@ def audiomux_wav_to_mkv(file_path=None, file_name=None, mux_pattern=[2,[14,15],[
             logger.error("MUXING FAILED. MKV {}".format(in_filename))
 
     return
+
 
 async def play_silence(
     event=None,
