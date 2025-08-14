@@ -48,25 +48,33 @@ def find_audio_card():
     audio_playback_hw_idx = 0
 
     # search for RECORDING card
-    rv = subprocess.check_output(['aplay -l | grep "Fireface UFX (23703154)"'], shell=True)
-    if "card" in rv.decode():
-        audio_recording_hw_idx = (rv.decode().split(":"))[0]
-        audio_recording_hw_idx = (audio_recording_hw_idx.split(" "))[1]
-        print(audio_recording_hw_idx)
-    else:
+    try:
+        rv = subprocess.check_output(['aplay -l | grep "Fireface UFX (23703154)"'], shell=True)
+        if "card" in rv.decode():
+            audio_recording_hw_idx = (rv.decode().split(":"))[0]
+            audio_recording_hw_idx = (audio_recording_hw_idx.split(" "))[1]
+            print(audio_recording_hw_idx)
+        else:
+            print("ERROR: cannot find recording audio card Fireface UFX (23703154), exit.")
+            exit(0)
+    except:
         print("ERROR: cannot find recording audio card Fireface UFX (23703154), exit.")
-        exit(0)
+        exit(1)
 
     # search for PLAYBACK card
-    rv = subprocess.check_output(['aplay -l | grep "Scarlett 2i2 USB"'], shell=True)
-    if "card" in rv.decode():
-        audio_playback_hw_idx = (rv.decode().split(":"))[0]
-        audio_playback_hw_idx = (audio_playback_hw_idx.split(" "))[1]
-        print(audio_playback_hw_idx)
-    else:
+    try:
+        rv = subprocess.check_output(['aplay -l | grep "Scarlett 2i2 USB"'], shell=True)
+        if "card" in rv.decode():
+            audio_playback_hw_idx = (rv.decode().split(":"))[0]
+            audio_playback_hw_idx = (audio_playback_hw_idx.split(" "))[1]
+            print(audio_playback_hw_idx)
+        else:
+            print("ERROR: cannot find recording audio card Scarlett 2i2 USB, exit.")
+            exit(0)
+    except:
         print("ERROR: cannot find recording audio card Scarlett 2i2 USB, exit.")
         exit(0)
-
+        
     return [audio_recording_hw_idx, audio_playback_hw_idx]
 
 
