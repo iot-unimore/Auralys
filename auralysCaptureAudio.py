@@ -23,6 +23,7 @@ _CMD_DIR = os.path.join(_ROOT_DIR, "./hrtf")
 _AURALIS_DIR = os.path.join(_ROOT_DIR,"./auralysSpeaker")
 _HRTF_DIR = os.path.join(_ROOT_DIR,"./hrtf")
 _AUDIO_DIR = os.path.join(_ROOT_DIR,"./audio")
+_VERSE_DIR=os.path.join(_ROOT_DIR, "../verse")
 
 _AZIMUT_BEGIN = 360
 _AZIMUT_END = 1
@@ -61,12 +62,10 @@ auralysPositions = [
     # [-75, 259,  684]
 ]
 
-_VERSE_PATH="./"
-
 verseVoicesPlayList =[
     ["unimore","000007_voice"],
+    ["unimore","000006_voice"],
     ["unimore","000005_voice"],
-    ["unimore","000004_voice"],
 ]
 
 

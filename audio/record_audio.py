@@ -24,6 +24,23 @@ logger = logging.getLogger(__name__)
 AUDIO_CONFIG_SYNTAX_NAME = "audio_recording"
 AUDIO_CONFIG_SYNTAX_VERSION_MIN = 0.1
 
+_ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
+_CMD_DIR = os.path.join(_ROOT_DIR, "../hrtf")
+_AURALIS_DIR = os.path.join(_ROOT_DIR,"../auralysSpeaker")
+_HRTF_DIR = os.path.join(_ROOT_DIR,"../hrtf")
+_AUDIO_DIR = os.path.join(_ROOT_DIR,"./audio")
+_VERSE_DIR=os.path.join(_ROOT_DIR, "../../verse")
+
+#
+# EXECUTABLES / EXTERNAL CMDs
+#
+_FFMPEG_EXE = "/usr/bin/ffmpeg"
+_FFPROBE_EXE = "/usr/bin/ffprobe"
+_APLAY_EXE = "/usr/bin/aplay"
+
+########################################################################################################################
+#  DO NOT MODIFY CODE BELOW THIS LINE
+########################################################################################################################
 
 def int_or_str(text):
     """Helper function for argument parsing."""
@@ -31,6 +48,26 @@ def int_or_str(text):
         return int(text)
     except ValueError:
         return text
+
+def audio_resample(infile, outfile, samplerate):
+    cmd = [
+        _FFMPEG_EXE,
+        "-y",
+        "-loglevel",
+        "error",
+        "-stats",
+        "-i",
+        str(infile),
+        "-ar",
+        str(samplerate),
+        str(outfile),
+        " > /dev/null 2>&1",
+    ]
+
+    logger.info("Running ffmpeg command:")
+    logger.info(" ".join(cmd))
+    os.system(" ".join(cmd))
+    return
 
 
 async def play_silence(
@@ -119,10 +156,11 @@ async def play_audio(
     event=None,
     device=None,
     verbose=False,
-    playback_amplitude=0.1,
+    data=None,    
+    playback_amplitude=1.0,
     samplerate=96000,
-    frequency_begin=20,
-    frequency_end=20000,
+    # frequency_begin=20,
+    # frequency_end=20000,
     playback_duration=15,
     playback_prepadding=2,
     playback_postpadding=2,
@@ -139,8 +177,8 @@ async def play_audio(
         nonlocal start_idx
         nonlocal samplerate
         nonlocal playback_amplitude
-        nonlocal frequency_begin
-        nonlocal frequency_end
+        # nonlocal frequency_begin
+        # nonlocal frequency_end
         nonlocal playback_duration
         nonlocal playback_prepadding
         nonlocal playback_postpadding
@@ -152,8 +190,8 @@ async def play_audio(
             logger.debug(status, file=sys.stderr)
 
         # exp sweep Parameters
-        f1 = frequency_begin
-        f2 = frequency_end
+        # f1 = frequency_begin
+        # f2 = frequency_end
         fs = samplerate
         # duration and zero padding
         P_pre = int(playback_prepadding)
@@ -186,27 +224,22 @@ async def play_audio(
         if (start_idx + frames) > (P_pre_idx):
             if start_idx > P_pre_idx:
                 frames_audio = frames
-                start_audio_idx = start_idx
-                # sweep time range
-                t = ((start_idx - P_pre_idx) + np.arange(frames_audio)) / samplerate
+                start_audio_idx = start_idx - P_pre_idx
             else:
                 frames_audio = (start_idx + frames) - P_pre_idx
-                start_audio_idx = P_pre_idx
-                # t = ((P_pre_idx - start_idx) + np.arange(frames_audio)) / samplerate
-                t = (np.arange(frames_audio)) / samplerate
-
-            t = t.reshape(-1, 1)
-
-            # sine sweep
-            R = np.log(f2 / f1)
-            outdata[(frames - frames_audio) :] = playback_amplitude * np.sin(
-                (2 * np.pi * f1 * T / R) * (np.exp(t * R / T) - 1)
-            )
+                start_audio_idx = 0 #P_pre_idx
+ 
+            # copy audio from source: handle tails across pre/post padding
+            if(start_audio_idx < len(data)):
+                if((start_audio_idx+frames_audio) < len(data)):
+                    outdata[(frames - frames_audio) :] = playback_amplitude * data[(start_audio_idx) : (start_audio_idx +frames_audio)]
+                else:
+                    frames_audio = len(data) - start_audio_idx
+                    outdata[:frames_audio] = playback_amplitude * data[start_audio_idx : ]
 
             # set to zero extra samples
             if (start_idx + frames) > (P_post_idx):
                 if start_idx < P_post_idx:
-                    # outdata[int(T * fs) - (start_idx + frames) :] = 0
                     outdata[(P_post_idx - start_idx) :] = 0
                 else:
                     outdata[:] = 0
@@ -216,8 +249,8 @@ async def play_audio(
     try:
         # samplerate = sd.query_devices(args.device, "output")["default_samplerate"]
 
-        logger.info("frequency_begin  [Hz]: " + str(frequency_begin))
-        logger.info("frequency_end    [Hz]: " + str(frequency_end))
+        # logger.info("frequency_begin  [Hz]: " + str(frequency_begin))
+        # logger.info("frequency_end    [Hz]: " + str(frequency_end))
         logger.info("duration:         [s]: " + str(playback_duration))
         logger.info("amplitude            : " + str(playback_amplitude))
         logger.info("sampling rate    [Hz]: " + str(samplerate))
@@ -347,36 +380,76 @@ async def playrecord(cli=False, **kwargs):
 
     for voice in kwargs["verseVoicesPlayList"]:
 
-        logger.error(f"PLAY NOW:{voice[0]}/{voice[1]}")
+        logger.info(f"playing voice:{voice[0]}/{voice[1]}")
 
-        # for r in range(kwargs["playback_repeat"]):
-        #     event.clear()
+        info_file=os.path.join(_VERSE_DIR,"resources/voices",voice[0],"info",voice[1])+".yaml"
 
-        #     asyncio.gather(
-        #         record_audio(
-        #             event=event,
-        #             device=kwargs["input_device"],
-        #             playback_repeat=r,
-        #             measure_folder=kwargs["measure_folder"],
-        #             measure_name=kwargs["measure_name"],
-        #             cli=cli,
-        #         ),
-        #         play_audio(
-        #             event=event,
-        #             verbose=kwargs["verbose"],
-        #             device=kwargs["output_device"],
-        #             playback_amplitude=kwargs["playback_amplitude"],
-        #             samplerate=kwargs["samplerate"],
-        #             frequency_begin=kwargs["frequency_begin"],
-        #             frequency_end=kwargs["frequency_end"],
-        #             playback_duration=kwargs["playback_duration"],
-        #             playback_postpadding=kwargs["playback_postpadding"],
-        #             playback_prepadding=kwargs["playback_prepadding"],
-        #             cli=cli,
-        #         ),
-        #     )
+        audio_yaml = []
+        try:
+            with open(info_file, "r") as file:
+                audio_yaml = yaml.safe_load(file)
+        except:
+            logger.error("cannot read audio info file {}".format(info_file))
 
-        #     await event.wait()
+
+        audio_file=os.path.join(_VERSE_DIR,"resources/voices",voice[0],audio_yaml["file"])
+
+        # load file and convert to MONO if needed
+        audio_data = []
+        audio_samplerate = kwargs["samplerate"]
+        if os.path.isfile(audio_file):
+            try:
+                audio_data, audio_samplerate = sf.read(audio_file, always_2d=True)
+            except:
+                logger.error("cannot read audio file {}".format(audio_file))
+
+        # check for resampling
+        if audio_samplerate != kwargs["samplerate"]:
+            audio_resample_filename = "_".join(["rs",str(kwargs["samplerate"]),voice[0],voice[1],".wav"])
+            audio_resample_file=os.path.join(kwargs["measure_folder"],audio_resample_filename)
+            # resample
+            if not (os.path.isfile(audio_resample_file)):
+                audio_resample(audio_file, audio_resample_file, kwargs["samplerate"])
+            # swap
+            audio_file=audio_resample_file    
+
+            # reload
+            if os.path.isfile(audio_file):
+                try:
+                    audio_data, audio_samplerate = sf.read(audio_file, always_2d=True)
+                except:
+                    logger.error("cannot read audio file {}".format(audio_file))
+
+
+        for r in range(kwargs["playback_repeat"]):
+            event.clear()
+
+            asyncio.gather(
+                record_audio(
+                    event=event,
+                    device=kwargs["input_device"],
+                    playback_repeat=r,
+                    measure_folder=kwargs["measure_folder"],
+                    measure_name=kwargs["measure_name"]+ "/" + voice[0] + "/" +voice[1],
+                    cli=cli,
+                ),
+                play_audio(
+                    event=event,
+                    verbose=kwargs["verbose"],
+                    device=kwargs["output_device"],
+                    data=audio_data,
+                    playback_amplitude=kwargs["playback_amplitude"],
+                    samplerate=audio_samplerate,
+                    # frequency_begin=kwargs["frequency_begin"],
+                    # frequency_end=kwargs["frequency_end"],
+                    playback_duration=len(audio_data)/audio_samplerate,
+                    playback_postpadding=kwargs["playback_postpadding"],
+                    playback_prepadding=kwargs["playback_prepadding"],
+                    cli=cli,
+                ),
+            )
+
+            await event.wait()
 
 
 def run_main(**kwargs):
@@ -449,6 +522,23 @@ def run_main(**kwargs):
         sys.exit(
             "\n[ERROR] cannot create rcordings output folders."
         )
+
+    # verify config files
+    for voice in kwargs["verseVoicesPlayList"]:
+        info_file=os.path.join(_VERSE_DIR,"resources/voices",voice[0],"info",voice[1])+".yaml"
+        if (os.path.isfile(info_file)):
+            try:
+                with open(info_file, "r") as file:
+                    tmp_yaml = []
+                    tmp_yaml = yaml.safe_load(file)
+            except:
+                sys.exit(
+                    "\n[ERROR] invalid yaml config file for {}.".format(voice)
+                )
+        else:
+            sys.exit(
+                "\n[ERROR] missing yaml config file for {}.".format(info_file)
+            )
 
     # uncomment this line to run audio recording
     return asyncio.run(playrecord(**kwargs))

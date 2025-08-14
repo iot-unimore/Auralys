@@ -23,7 +23,7 @@ audio_format: PCM_24
 playback_prepadding: 2
 playback_postpadding: 2
 playback_repeat: 1
-playback_amplitude: 0.8
+playback_amplitude: 1.0
 
 # output recordings
 measure_folder: ./measures/test-default
