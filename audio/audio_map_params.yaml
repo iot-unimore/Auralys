@@ -1,0 +1,62 @@
+---
+# config file type: recording audio map
+# this config file is needed to run a series of
+# audio recordings automatically.
+# settings of this file will configure audio levels,
+# listener positioning etc.
+
+syntax:
+  name: audio_recording_map
+  version:
+    major: 0
+    minor: 2
+    revision: 0
+
+# audio playlist config file
+audio_yaml_config: ./ess_params.yaml
+
+# audio recording format params
+samplerate: 96000
+audio_format: PCM_24
+
+# audio sweep playback params
+playback_repeat: 1
+playback_amplitude: 0.8
+
+# output recordings
+measure_folder: ./measures/test-default
+measure_name: test
+
+#
+# coordinates for space location
+# see AES-2022 cap 4.1
+# rotations are defined as azimuth/elevation
+#
+
+# source-vs-listener (head) localization
+azimuth_begin: 355
+azimuth_end: 0
+azimuth_step: -5
+
+elevation_begin: 0
+elevation_end:   0
+elevation_step:  0
+
+distance_begin: 1
+distance_end:   1
+distance_step:  0
+
+# rotating_table info
+# rotation: clock-wise (CW) or CCW
+rtable_direction: ccw
+
+# audio recording hw I/O
+input_device: hw:3,0
+output_device: hw:2,0
+
+# extra
+verbose: False
+test: False
+
+#EOF
+...
