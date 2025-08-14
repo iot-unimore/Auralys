@@ -102,7 +102,7 @@ def find_audio_card():
         if "card" in rv.decode():
             audio_playback_hw_idx = (rv.decode().split(":"))[0]
             audio_playback_hw_idx = (audio_playback_hw_idx.split(" "))[1]
-            print(audio_playback_hw_idx)
+            # print(audio_playback_hw_idx)
         else:
             print(f"ERROR: cannot find recording audio card {_AUDIO_PLAYBACK_DEVICE_ID}, exit.")
             exit(0)
