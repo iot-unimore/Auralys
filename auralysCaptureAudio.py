@@ -26,8 +26,8 @@ _AUDIO_DIR = os.path.join(_ROOT_DIR,"./audio")
 _VERSE_DIR=os.path.join(_ROOT_DIR, "../verse")
 
 _AZIMUT_BEGIN = 360
-_AZIMUT_END = 1
-_AZIMUT_STEP = -10
+_AZIMUT_END = 260
+_AZIMUT_STEP = -5
 
 _AUDIO_MAP_CFG_NAME="audio_map_params"
 _AUDIO_CFG_NAME="audio_params"
@@ -51,6 +51,7 @@ _APLAY_EXE = "/usr/bin/aplay"
 auralysPositions = [
     # [75,  259, 2616],
     # [60,  500, 2516],
+    #
     [45, 707, 2490],
     [30, 866, 2200],
     [15, 910, 2000],
@@ -58,6 +59,7 @@ auralysPositions = [
     [-15, 960, 1391],
     [-30, 870, 1100],
     [-45, 800, 900],
+    #
     # [-60, 500,  784],
     # [-75, 259,  684]
 ]
@@ -183,7 +185,7 @@ if __name__ == "__main__":
         print("==============================================================")
 
         # move speaker in position
-#        rv = subprocess.run([_AURALIS_DIR+"/auralysSpeaker/cli/auralys_ctrl.py","-c","set","position","-p",str(position),"-rs",str(-1 * int(row[0])),"-t","ac","-v",],stdout=subprocess.PIPE).stdout.decode("utf-8")
+        rv = subprocess.run([_AURALIS_DIR+"/cli/auralys_ctrl.py","-c","set","position","-p",str(position),"-rs",str(-1 * int(row[0])),"-t","ac","-v",],stdout=subprocess.PIPE).stdout.decode("utf-8")
 
         # wait for stabilization of the speaker
         time.sleep(3)
@@ -235,7 +237,7 @@ if __name__ == "__main__":
                 "/media/gfilippi/audiodata/wilsonAudio_20250809-001",
                 "-n",
                 "wilsonAudio",
-                "-t",
+                # "-t",
             ],
             stdout=subprocess.PIPE,
         ).stdout.decode("utf-8")
@@ -243,4 +245,4 @@ if __name__ == "__main__":
     time.sleep(3)
 
     # back to zero position: speaker & table
-#    rv = subprocess.run([_AURALIS_DIR+"/cli/auralys_ctrl.py", "-c", "cmd", "gozero", "-rs", "0", "-rt", "0", "-v"],stdout=subprocess.PIPE).stdout.decode("utf-8")
+    rv = subprocess.run([_AURALIS_DIR+"/cli/auralys_ctrl.py", "-c", "cmd", "gozero", "-rs", "0", "-rt", "0", "-v"],stdout=subprocess.PIPE).stdout.decode("utf-8")

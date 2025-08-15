@@ -532,14 +532,15 @@ if __name__ == "__main__":
             if yaml_params["rtable_direction"] == "ccw":
                 angle_adj = (360 - int(angle)) % 360
 
-            # debug only:
-            if result["error"] == 0:
-                time.sleep(1)
-                record_audio.run_main(**yaml_params)
-            else:
-                logger.error("[ERROR]: cannot set rotating table position, angle={}".format(angle_adj))
+            # debug:
+            # if result["error"] == 0:
+            #     time.sleep(1)
+            #     record_audio.run_main(**yaml_params)
+            # else:
+            #     logger.error("[ERROR]: cannot set rotating table position, angle={}".format(angle_adj))
 
-            if(0):
+            # release:
+            if(1):
                 # rotate table
                 rv = subprocess.run(
                     [_CMD_DIR + "/cmd_set_position.sh", str(angle_adj)], stdout=subprocess.PIPE
