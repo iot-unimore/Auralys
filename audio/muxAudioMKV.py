@@ -63,6 +63,15 @@ def int_or_str(text):
     except ValueError:
         return text
 
+
+def restore_terminal():
+    try:
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, termios.tcgetattr(sys.stdin.fileno()))
+    except:
+        pass
+    os.system("stty sane")  # fallback
+
+
 def getMediaInfo(filename, print_result=True):
     """
     Returns:
@@ -234,7 +243,7 @@ def find_files_with_regex(file_path, file_name_pattern):
     return matches
 
 
-def audiomux_files(path, cpu_cores=1):
+def audiomux_files(args, path, cpu_cores=1):
     auralys_wav_list=[]
 
     wav_list = find_files_with_regex(path, "_0.wav")
@@ -266,20 +275,36 @@ def audiomux_files(path, cpu_cores=1):
             cpu_pool.close()
             cpu_pool.join()
 
-
-def run_main(args):
-
-    if os.path.isdir(args.input):
-        print("FOLDER")
-
-        audiomux_files(args.input, 8)
-
-    if os.path.isfile(args.input):
-        print("FILE")
+    if(args.remove==True):
+        if(len(auralys_wav_list)>0):
+            for f in auralys_wav_list:
+                os.remove(f)
 
 
 #
 # MAIN
+#
+
+def run_main(args):
+
+    try:
+        if os.path.isdir(args.input):
+            audiomux_files(args, args.input, args.cpu_process)
+        elif os.path.isfile(args.input):
+            audiomux_wav_to_mkv(args.input, args.cpu_process)
+            os.remove(args.input)
+        else:
+            print("wrong input file/path.")
+
+    except KeyboardInterrupt:
+        print("\nInterrupted by user")
+
+    # clean exit
+    restore_terminal()
+
+
+#
+# MAIN - CLI
 #
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(add_help=False)
@@ -298,8 +323,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-r",
         "--remove",
-        type=bool,
-        required=False,
+        action="store_true",
         default=False,
         help="remove original files after mux (default: %(default)s)",
     )
@@ -310,6 +334,14 @@ if __name__ == "__main__":
         default=False,
         help="verbose (default: %(default)s)",
     )
+    parser.add_argument(
+        "-c",
+        "--cpu_process",
+        type=int,
+        default=4,
+        required=False,
+        help="maximum number of CPU process to use",
+    )    
 
     args, remaining = parser.parse_known_args()
 
@@ -322,7 +354,7 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.WARNING)
 
     #
-    # setup log
+    # mux
     #
     # logger.info("-" * 80)
     # logger.info("SETUP:")
