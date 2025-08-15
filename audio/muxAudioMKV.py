@@ -17,7 +17,8 @@ import logging
 import tempfile
 import json
 import subprocess
-
+from multiprocessing import Pool
+from setproctitle import setproctitle
 from subprocess import check_output
 
 
@@ -43,6 +44,13 @@ _AURALYS_WAV_CHANNELS_COUNT = 22
 _FFMPEG_EXE = "/usr/bin/ffmpeg"
 _FFPROBE_EXE = "/usr/bin/ffprobe"
 _APLAY_EXE = "/usr/bin/aplay"
+
+#
+# HW RESOURCES
+#
+_MIN_CPU_COUNT = 1  # we need at least one CPU for each compute process
+_MIN_MEM_GB = 0.2  # min amount of memory for each compute process
+_MAX_MEM_GB = 0.2  # max amount of memory for each compute process
 
 ########################################################################################################################
 #  DO NOT MODIFY CODE BELOW THIS LINE
@@ -100,14 +108,17 @@ def extract_track(audio_in, track_num, audio_out):
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return
 
-def audiomux_wav_to_mkv(file_path=None, file_name=None, mux_pattern=[2,[14,15],[16,17],[18,19],[20,21]]):
+def audiomux_wav_to_mkv(audiofile=None, mux_pattern=[2,[14,15],[16,17],[18,19],[20,21]]):
     """
     remux the multi-track audio file into MKV
     with specific pattern
     """
 
+    f_path = os.path.dirname(audiofile)
+    f_name = os.path.splitext(os.path.basename(audiofile))[0]
+
     # load file
-    in_filename = os.path.join(file_path, file_name+".wav")
+    in_filename = os.path.join(f_path, f_name+".wav")
 
     data_info =getMediaInfo(in_filename, print_result=False)
 
@@ -124,7 +135,7 @@ def audiomux_wav_to_mkv(file_path=None, file_name=None, mux_pattern=[2,[14,15],[
         #for idx in np.arange(data_info["streams"][0]["channels"]):
         for idx in [2,14,15,16,17,18,19,20,21]:
 
-            out_filename=os.path.join(tmpdir, file_name+"_"+str(idx)+".wav"  )
+            out_filename=os.path.join(tmpdir, f_name+"_"+str(idx)+".wav"  )
             logger.info("EXTRACT {} TO: {}".format(idx,out_filename))
             extract_track(audio_in=in_filename, track_num=idx, audio_out=out_filename)
 
@@ -132,51 +143,51 @@ def audiomux_wav_to_mkv(file_path=None, file_name=None, mux_pattern=[2,[14,15],[
         # ToDo: remove this hardcoded muxing patter and use the input mux_pattern
         # #######################################################################
 
-        in_filename = os.path.join(file_path, file_name+".mkv")
+        in_filename = os.path.join(f_path, f_name+".mkv")
 
         logger.info("MUXING {}".format(in_filename))
 
         # mono-to-stereo :binaural
-        file_L=os.path.join(tmpdir, file_name+"_"+str(14))+".wav"
-        file_R=os.path.join(tmpdir, file_name+"_"+str(15))+".wav"
-        file_out=os.path.join(tmpdir, file_name+"_binaural.wav")
+        file_L=os.path.join(tmpdir, f_name+"_"+str(14))+".wav"
+        file_R=os.path.join(tmpdir, f_name+"_"+str(15))+".wav"
+        file_out=os.path.join(tmpdir, f_name+"_binaural.wav")
         cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex","\"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"","-acodec","pcm_s24le",str(file_out)," > /dev/null 2>&1"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         os.system(" ".join(cmd))
 
         # mono-to-stereo :array_six_front
-        file_L=os.path.join(tmpdir, file_name+"_"+str(16))+".wav"
-        file_R=os.path.join(tmpdir, file_name+"_"+str(17))+".wav"
-        file_out=os.path.join(tmpdir, file_name+"_array_six_front.wav")
+        file_L=os.path.join(tmpdir, f_name+"_"+str(16))+".wav"
+        file_R=os.path.join(tmpdir, f_name+"_"+str(17))+".wav"
+        file_out=os.path.join(tmpdir, f_name+"_array_six_front.wav")
         cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex","\"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"","-acodec","pcm_s24le",str(file_out)," > /dev/null 2>&1"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)        
         os.system(" ".join(cmd))
 
         # mono-to-stereo :array_six_middle
-        file_L=os.path.join(tmpdir, file_name+"_"+str(18))+".wav"
-        file_R=os.path.join(tmpdir, file_name+"_"+str(19))+".wav"
-        file_out=os.path.join(tmpdir, file_name+"_array_six_middle.wav")
+        file_L=os.path.join(tmpdir, f_name+"_"+str(18))+".wav"
+        file_R=os.path.join(tmpdir, f_name+"_"+str(19))+".wav"
+        file_out=os.path.join(tmpdir, f_name+"_array_six_middle.wav")
         cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex","\"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"","-acodec","pcm_s24le",str(file_out)," > /dev/null 2>&1"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)        
         os.system(" ".join(cmd))
 
         # mono-to-stereo :array_six_rear
-        file_L=os.path.join(tmpdir, file_name+"_"+str(20))+".wav"
-        file_R=os.path.join(tmpdir, file_name+"_"+str(21))+".wav"
-        file_out=os.path.join(tmpdir, file_name+"_array_six_rear.wav")
+        file_L=os.path.join(tmpdir, f_name+"_"+str(20))+".wav"
+        file_R=os.path.join(tmpdir, f_name+"_"+str(21))+".wav"
+        file_out=os.path.join(tmpdir, f_name+"_array_six_rear.wav")
         cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex","\"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"","-acodec","pcm_s24le",str(file_out)," > /dev/null 2>&1"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)        
         os.system(" ".join(cmd))
 
         logger.info("MUXING MKV {}".format(in_filename))
-        file_in=os.path.join(tmpdir, file_name+"_"+str(2)+".wav")
-        file_out= os.path.join(file_path, file_name+".mkv")
+        file_in=os.path.join(tmpdir, f_name+"_"+str(2)+".wav")
+        file_out= os.path.join(f_path, f_name+".mkv")
         cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats",
             "-i", str(file_in),
-            "-i",str(os.path.join(tmpdir, file_name+"_binaural.wav")),
-            "-i",str(os.path.join(tmpdir, file_name+"_array_six_front.wav")),
-            "-i",str(os.path.join(tmpdir, file_name+"_array_six_middle.wav")),
-            "-i",str(os.path.join(tmpdir, file_name+"_array_six_rear.wav")),
+            "-i",str(os.path.join(tmpdir, f_name+"_binaural.wav")),
+            "-i",str(os.path.join(tmpdir, f_name+"_array_six_front.wav")),
+            "-i",str(os.path.join(tmpdir, f_name+"_array_six_middle.wav")),
+            "-i",str(os.path.join(tmpdir, f_name+"_array_six_rear.wav")),
             "-map","0:a",
             "-map","1:a",
             "-map","2:a",
@@ -223,7 +234,7 @@ def find_files_with_regex(file_path, file_name_pattern):
     return matches
 
 
-def audiomux_files(path):
+def audiomux_files(path, cpu_cores=1):
     auralys_wav_list=[]
 
     wav_list = find_files_with_regex(path, "_0.wav")
@@ -236,11 +247,24 @@ def audiomux_files(path):
 
     if(len(auralys_wav_list)>0):
         # mux them all
-        for f in auralys_wav_list:
-            f_path = os.path.dirname(f)
-            f_name = os.path.splitext(os.path.basename(f))[0]
-            audiomux_wav_to_mkv(file_path=f_path, file_name=f_name)
 
+        # compute process pool size based on CPU/MEM requirements
+        mem_bytes = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")  # e.g. 4015976448
+        mem_gib = mem_bytes / (1024.0**3)  # e.g. 3.74
+        cpu_count = min([(os.cpu_count() - 2), cpu_cores])
+        cpu_count = max([_MIN_CPU_COUNT, cpu_count])
+
+        if(cpu_count==1):
+            for f in auralys_wav_list:
+                audiomux_wav_to_mkv(f)
+        else:
+            max_pool_size = min(cpu_count, int(mem_gib / _MIN_MEM_GB))
+            print("Pool size: {}".format(max_pool_size))
+            cpu_pool = Pool(max_pool_size)
+            if len(auralys_wav_list) > 0:
+                result = cpu_pool.map(audiomux_wav_to_mkv, auralys_wav_list)
+            cpu_pool.close()
+            cpu_pool.join()
 
 
 def run_main(args):
@@ -248,7 +272,7 @@ def run_main(args):
     if os.path.isdir(args.input):
         print("FOLDER")
 
-        audiomux_files(args.input)
+        audiomux_files(args.input, 8)
 
     if os.path.isfile(args.input):
         print("FILE")
