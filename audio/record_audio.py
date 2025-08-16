@@ -140,7 +140,7 @@ async def play_silence(
             logger.error("unsupported audio playback format 48k")
 
         # playback stream
-        stream = sd.OutputStream(device=device, channels=1, samplerate=samplerate, callback=silence_callback, **kwargs)
+        stream = sd.OutputStream(device=device, channels=2, samplerate=samplerate, callback=silence_callback, **kwargs)
 
         with stream:
             if cli:
@@ -195,10 +195,8 @@ async def play_audio(
         if status:
             logger.debug(status, file=sys.stderr)
 
-        # exp sweep Parameters
-        # f1 = frequency_begin
-        # f2 = frequency_end
         fs = samplerate
+
         # duration and zero padding
         P_pre = int(playback_prepadding)
         P_post = int(playback_postpadding)
@@ -238,7 +236,7 @@ async def play_audio(
             # copy audio from source: handle tails across pre/post padding
             if(start_audio_idx < len(data)):
                 if((start_audio_idx+frames_audio) < len(data)):
-                    outdata[(frames - frames_audio) :] = playback_amplitude * data[(start_audio_idx) : (start_audio_idx +frames_audio)]
+                    outdata[(frames - frames_audio) :] = playback_amplitude * data[start_audio_idx : (start_audio_idx +frames_audio)]
                 else:
                     frames_audio = len(data) - start_audio_idx
                     outdata[:frames_audio] = playback_amplitude * data[start_audio_idx : ]
@@ -273,7 +271,7 @@ async def play_audio(
             logger.error("unsupported audio playback format 48k")
 
         # playback stream
-        stream = sd.OutputStream(device=device, channels=1, samplerate=samplerate, callback=audio_callback, **kwargs)
+        stream = sd.OutputStream(device=device, channels=2, samplerate=samplerate, blocksize=10240, callback=audio_callback, **kwargs)
 
         with stream:
             if cli:
@@ -632,7 +630,7 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input_device", type=int_or_str, help="input device (numeric ID or substring)")
     parser.add_argument("-o", "--output_device", type=int_or_str, help="output device (numeric ID or substring)")
     parser.add_argument(
-        "-aa", "--playback_amplitude", type=float, default=0.2, help="audio amplitude level(default: %(default)s)"
+        "-aa", "--playback_amplitude", type=float, default=0.8, help="audio amplitude level(default: %(default)s)"
     )
 
     args = parser.parse_args(remaining)

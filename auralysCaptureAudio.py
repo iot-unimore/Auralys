@@ -36,8 +36,10 @@ _AUDIO_CFG_NAME="audio_params"
 _USE_ALTERNATE_AZIMUTH = False
 
 # AUDIO CARD USB IDs
+# we the same "RME Fireface UFX" card for record/playback
+# this is to guarantee clock sync accuracy
 _AUDIO_RECORDING_DEVICE_ID = "Fireface UFX (23703154)"
-_AUDIO_PLAYBACK_DEVICE_ID = "Scarlett 2i2 USB"
+_AUDIO_PLAYBACK_DEVICE_ID = "Fireface UFX (23703154)"
 
 #
 # EXECUTABLES / EXTERNAL CMDs
@@ -135,8 +137,8 @@ def update_audio_map_params(
     data["elevation_begin"] = int(elevation_begin)
     data["elevation_end"] = int(elevation_end)
 
-    data["input_device"] = "hw:" + str(hw_recoding_idx) + ",0"
-    data["output_device"] = "hw:" + str(hw_playback_idx) + ",0"
+    data["input_device"] = "plughw:" + str(hw_recoding_idx) + ",0"
+    data["output_device"] = "plughw:" + str(hw_playback_idx) + ",0"
 
     # voices to play
     data["verseVoicesPlayList"] = verseVoicesPlayList

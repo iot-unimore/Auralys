@@ -53,8 +53,8 @@ distance_step:  0
 rtable_direction: ccw
 
 # audio recording hw I/O
-input_device: hw:3,0
-output_device: hw:2,0
+input_device: plughw:2,0
+output_device: plughw:2,0
 
 # extra
 verbose: False
