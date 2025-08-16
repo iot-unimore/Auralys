@@ -135,8 +135,8 @@ def update_audio_map_params(
     data["elevation_begin"] = int(elevation_begin)
     data["elevation_end"] = int(elevation_end)
 
-    data["input_device"] = "hw:" + hw_recoding_idx + ",0"
-    data["output_device"] = "hw:" + hw_playback_idx + ",0"
+    data["input_device"] = "hw:" + str(hw_recoding_idx) + ",0"
+    data["output_device"] = "hw:" + str(hw_playback_idx) + ",0"
 
     # voices to play
     data["verseVoicesPlayList"] = verseVoicesPlayList
