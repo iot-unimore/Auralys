@@ -600,7 +600,27 @@ if __name__ == "__main__":
         default="audio",
         help="measure output name (default: %(default)s)",
     )
-
+    parser.add_argument(
+        "-r",
+        "--playback_repeat",
+        type=int,
+        default=1,
+        help="audio repetitions (default: %(default)s)",
+    )    
+    parser.add_argument(
+        "-q",
+        "--playback_prepadding",
+        type=int,
+        default=2,
+        help="playback silence pre-padding in s (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-p",
+        "--playback_postpadding",
+        type=int,
+        default=2,
+        help="playback silence post-padding in s (default: %(default)s)",
+    )
     parser.add_argument(
         "-v",
         "--verbose",
@@ -630,6 +650,7 @@ if __name__ == "__main__":
         try:
             with open(args.audio_yaml_config, "r") as file:
                 audio_config = yaml.safe_load(file)
+
         except:
             sys.exit("\n[ERROR] cannot open/parse yaml config file: {}".format(args.audio_yaml_config))
 
@@ -647,6 +668,50 @@ if __name__ == "__main__":
 
         # audio recording
         audio_config["custom"]["recording"]["samplerate"] = args.samplerate
+        audio_config["custom"]["recording"]["format"] = "wav"
+        audio_config["custom"]["recording"]["subformat"] = "PCM_24"
+        audio_config["custom"]["recording"]["bit_depth"] = "s24be"
+
+        # update file naming
+        audio_config["custom"]["project_folder"] = args.measure_folder.split("/")[-1]
+        audio_config["custom"]["audio_folder"] = args.measure_name
+        audio_config["custom"]["audio_filename"] = "audio_0"
+
+        # update general section
+        audio_config["general"]["date_modified"] = datetime.date.today()
+
+        # add versePlaybackList
+        tmpList = audio_config["verseVoicesPlayList"]
+        audio_config["verseVoicesPlayList"]={}
+        idx=0
+
+        for voice in tmpList:
+            audio_config["verseVoicesPlayList"][idx]={}
+            audio_config["verseVoicesPlayList"][idx]["type"]="voice"
+            audio_config["verseVoicesPlayList"][idx]["subtype"]=voice[0]
+            audio_config["verseVoicesPlayList"][idx]["info"]=voice[1]
+            idx+=1
+
+   
+        # workaround, need to clean up this part
+        args.verseVoicesPlayList=[]
+        idx=0
+        for voice in tmpList:
+            args.verseVoicesPlayList.append(voice)
+            # args.verseVoicesPlayList[idx]["type"]="voice"
+            # args.verseVoicesPlayList[idx]["subtype"]=voice[0]
+            # args.verseVoicesPlayList[idx]["info"]=voice[1]
+            idx+=1
+        # end-workaround
+
+        # prepare audio recording folders
+        try:
+            for voice in tmpList:
+                 os.makedirs(os.path.join(args.measure_folder, args.measure_name, voice[0], voice[1]))
+        except:
+            sys.exit(
+                "\n[ERROR] cannot create recordings output folders."
+            )
 
         # write output config
         try:
