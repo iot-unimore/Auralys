@@ -101,7 +101,7 @@ async def play_silence(
             logger.error("unsupported audio playback format 48k")
 
         # playback stream
-        stream = sd.OutputStream(device=device, channels=1, samplerate=samplerate, callback=silence_callback, **kwargs)
+        stream = sd.OutputStream(device=device, channels=2, samplerate=samplerate, callback=silence_callback, **kwargs)
 
         with stream:
             if cli:
@@ -238,7 +238,7 @@ async def play_expsweep(
             logger.error("unsupported audio playback format 48k")
 
         # playback stream
-        stream = sd.OutputStream(device=device, channels=1, samplerate=samplerate, callback=ess_callback, **kwargs)
+        stream = sd.OutputStream(device=device, channels=2,  blocksize=10240, samplerate=samplerate, callback=ess_callback, **kwargs)
 
         with stream:
             if cli:
