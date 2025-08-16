@@ -25,15 +25,15 @@ _HRTF_DIR = os.path.join(_ROOT_DIR,"./hrtf")
 _AUDIO_DIR = os.path.join(_ROOT_DIR,"./audio")
 _VERSE_DIR=os.path.join(_ROOT_DIR, "../verse")
 
-_AZIMUT_BEGIN = 360
-_AZIMUT_END = 260
-_AZIMUT_STEP = -5
+_AZIMUTH_BEGIN = 360
+_AZIMUTH_END = 1
+_AZIMUTH_STEP = -10
 
 _AUDIO_MAP_CFG_NAME="audio_map_params"
 _AUDIO_CFG_NAME="audio_params"
 
 # Use alternating pattern for AZIMUTH position
-_USE_ALTERNATE_AZIMUTH = True
+_USE_ALTERNATE_AZIMUTH = False
 
 # AUDIO CARD USB IDs
 _AUDIO_RECORDING_DEVICE_ID = "Fireface UFX (23703154)"
@@ -162,15 +162,15 @@ if __name__ == "__main__":
     #
     # sanity checks on azimut begin/end
     #
-    if _AZIMUT_STEP == 0:
+    if _AZIMUTH_STEP == 0:
         print("invalid azimut step, exiting")
         exit(1)
-    elif _AZIMUT_STEP > 0:
-        if _AZIMUT_BEGIN > _AZIMUT_END:
+    elif _AZIMUTH_STEP > 0:
+        if _AZIMUTH_BEGIN > _AZIMUTH_END:
             print("invalid azimut begin/end and step combination, exiting")
             exit(1)
-    elif _AZIMUT_STEP < 0:
-        if _AZIMUT_BEGIN < _AZIMUT_END:
+    elif _AZIMUTH_STEP < 0:
+        if _AZIMUTH_BEGIN < _AZIMUTH_END:
             print("invalid azimut begin/end and step combination, exiting")
             exit(1)
 
@@ -191,12 +191,12 @@ if __name__ == "__main__":
         time.sleep(3)
 
         # compute real azimut begin/end values
-        azimuth_begin = _AZIMUT_BEGIN
-        azimuth_end = _AZIMUT_END
+        azimuth_begin = _AZIMUTH_BEGIN
+        azimuth_end = _AZIMUTH_END
         if _USE_ALTERNATE_AZIMUTH == True:
             if (idx % 2) == 0:
-                azimuth_begin = int(_AZIMUT_BEGIN + (_AZIMUT_STEP / 2))
-                azimuth_end = int(_AZIMUT_END + (_AZIMUT_STEP / 2))
+                azimuth_begin = int(_AZIMUTH_BEGIN + (_AZIMUTH_STEP / 2))
+                azimuth_end = int(_AZIMUTH_END + (_AZIMUTH_STEP / 2))
 
         # for next iteration
         idx += 1
@@ -216,9 +216,6 @@ if __name__ == "__main__":
         # record audio voices
         #
 
-        # step 10 deg, SWEEP
-        # rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-10","-m","/media/gfilippi/audiodata/wilsonClean_20250809-001","-n","wilsonClean"], stdout=subprocess.PIPE).stdout.decode("utf-8")
-
         rv = subprocess.run(
             [
                 _AUDIO_DIR+"/record_audio_map.py",
@@ -232,7 +229,7 @@ if __name__ == "__main__":
                 "-ae",
                 str(azimuth_end),
                 "-as",
-                str(_AZIMUT_STEP),
+                str(_AZIMUTH_STEP),
                 "-m",
                 "/media/gfilippi/audiodata/wilsonAudio_20250809-001",
                 "-n",
