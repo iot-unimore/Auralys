@@ -145,7 +145,7 @@ async def play_silence(
         with stream:
             if cli:
                 print("#" * 80)
-                print("praudio CTRL-C to stop playback")
+                print("press CTRL-C to stop playback")
                 print("#" * 80)
             await event.wait()
 
@@ -276,7 +276,7 @@ async def play_audio(
         with stream:
             if cli:
                 print("#" * 80)
-                print("praudio CTRL-C to stop playback")
+                print("press CTRL-C to stop playback")
                 print("#" * 80)
             await event.wait()
 
@@ -335,7 +335,7 @@ async def record_audio(
         with stream:
             if cli:
                 print("#" * 80)
-                print("praudio Ctrl+C to stop recording")
+                print("press Ctrl+C to stop recording")
                 print("#" * 80)
             await event.wait()
 
