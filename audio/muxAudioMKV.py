@@ -166,22 +166,22 @@ def audiomux_wav_to_mkv(audiofile=None, mux_pattern=[2,[14,15],[16,17],[18,19],[
 
         # mono-to-stereo :array_six_front
         file_L=os.path.join(tmpdir, f_name+"_"+str(16))+".wav"
-        file_R=os.path.join(tmpdir, f_name+"_"+str(17))+".wav"
+        file_R=os.path.join(tmpdir, f_name+"_"+str(19))+".wav"
         file_out=os.path.join(tmpdir, f_name+"_array_six_front.wav")
         cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex","\"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"","-acodec","pcm_s24le",str(file_out)," > /dev/null 2>&1"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)        
         os.system(" ".join(cmd))
 
         # mono-to-stereo :array_six_middle
-        file_L=os.path.join(tmpdir, f_name+"_"+str(18))+".wav"
-        file_R=os.path.join(tmpdir, f_name+"_"+str(19))+".wav"
+        file_L=os.path.join(tmpdir, f_name+"_"+str(17))+".wav"
+        file_R=os.path.join(tmpdir, f_name+"_"+str(20))+".wav"
         file_out=os.path.join(tmpdir, f_name+"_array_six_middle.wav")
         cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex","\"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"","-acodec","pcm_s24le",str(file_out)," > /dev/null 2>&1"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)        
         os.system(" ".join(cmd))
 
         # mono-to-stereo :array_six_rear
-        file_L=os.path.join(tmpdir, f_name+"_"+str(20))+".wav"
+        file_L=os.path.join(tmpdir, f_name+"_"+str(18))+".wav"
         file_R=os.path.join(tmpdir, f_name+"_"+str(21))+".wav"
         file_out=os.path.join(tmpdir, f_name+"_array_six_rear.wav")
         cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats","-i",str(file_L),"-i",str(file_R),"-filter_complex","\"[0:a][1:a]join=inputs=2:channel_layout=stereo[aout]\"", "-map \"[aout]\"","-acodec","pcm_s24le",str(file_out)," > /dev/null 2>&1"]
