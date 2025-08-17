@@ -861,8 +861,8 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-l",
-        "--log",
+        "-log",
+        "--logfile",
         type=str,
         default=None,
         help="log verbose output to file (default: %(default)s)",
