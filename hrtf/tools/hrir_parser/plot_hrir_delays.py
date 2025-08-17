@@ -41,11 +41,11 @@ def find_files_glob(pattern):
 
 def find_files_regex(root_dir, pattern):
     matched_files = []
-    regex = re.compile(pattern)
     for dirpath, _, filenames in os.walk(root_dir):
         for filename in filenames:
             full_path = os.path.join(dirpath, filename)
-            if regex.fullmatch(full_path):
+            print(str(full_path))
+            if re.search( pattern, str(full_path)):
                 matched_files.append(full_path)
     return matched_files
 
