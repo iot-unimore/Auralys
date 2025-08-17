@@ -28,7 +28,7 @@ custom:
       repeat:
         value: 1
       amplitude:
-        value: 0.8
+        value: 1.0
         max: 1.0
         min: 0.0
       padding:
