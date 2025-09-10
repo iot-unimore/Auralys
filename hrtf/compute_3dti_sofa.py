@@ -207,6 +207,7 @@ def read_ir_sample(params):
     zero_delay = params[4]
     samples_ir_window = params[5]
     sofa_data_ir = params[6]
+    sofa_data_delay = params[7]
 
     selection_list = range(config["setup"]["listeners"][0]["receivers_count"])
     if receivers_list != None:
@@ -262,11 +263,14 @@ def read_ir_sample(params):
                         sofa_data_ir[i, idx, 0:tmp] = ir_pyfar["ir_norm_hipass_window"].time[0][
                             ir_delay_samples : (ir_delay_samples + tmp)
                         ]
+
+                        sofa_data_delay[i, idx] = ir_delay_samples                        
                     else:
                         sofa_data_ir[i, ii, 0:tmp] = ir_pyfar["ir_norm_hipass_window"].time[0][
                             ir_delay_samples : (ir_delay_samples + tmp)
                         ]
 
+                        sofa_data_delay[i, ii] = ir_delay_samples
                 else:
                     logger.error(
                         "ERROR: invalide delay samples for:{} rx_id:{} [{}<{}] ".format(
@@ -277,7 +281,7 @@ def read_ir_sample(params):
         idx += 1
 
 
-def read_ir_samples(data=None, configs=None, folders=None, zero_delay=False, receivers_list=None, samples_ir_window=0):
+def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero_delay=False, receivers_list=None, samples_ir_window=0):
     global _CTRL_EXIT_SIGNAL
 
     err = 0
@@ -286,8 +290,6 @@ def read_ir_samples(data=None, configs=None, folders=None, zero_delay=False, rec
         selection_list = range(configs[i]["setup"]["listeners"][0]["receivers_count"])
         if receivers_list != None:
             selection_list = receivers_list
-
-        print(selection_list)
 
         idx = 0
         for ii in selection_list:  # range(configs[i]["setup"]["listeners"][0]["receivers_count"]):
@@ -333,7 +335,6 @@ def read_ir_samples(data=None, configs=None, folders=None, zero_delay=False, rec
 
                     # ir_delay_samples = compute_delay(ir_pyfar["ir_norm_hipass_window"].time[0])
                     ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
-
                     ir_len = ir_pyfar["ir_norm_hipass_window"].n_samples
 
                     if ir_len > ir_delay_samples:
@@ -346,10 +347,14 @@ def read_ir_samples(data=None, configs=None, folders=None, zero_delay=False, rec
                             data[i, idx, 0:tmp] = ir_pyfar["ir_norm_hipass_window"].time[0][
                                 ir_delay_samples : (ir_delay_samples + tmp)
                             ]
+
+                            data_delay[i, idx] = ir_delay_samples
                         else:
                             data[i, ii, 0:tmp] = ir_pyfar["ir_norm_hipass_window"].time[0][
                                 ir_delay_samples : (ir_delay_samples + tmp)
                             ]
+
+                            data_delay[i, ii] = ir_delay_samples                            
                     else:
                         logger.error(
                             "ERROR: invalide delay samples for:{} rx_id:{} [{}<{}] ".format(
@@ -840,6 +845,7 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
                         zero_delay,
                         samples_ir_window,
                         sofa.Data_IR,
+                        sofa.Data_Delay,
                     )
                 )
 
@@ -860,6 +866,7 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
             if yaml_params["zero_delay"] == False:
                 read_ir_samples(
                     data=sofa.Data_IR,
+                    data_delay=sofa.Data_Delay,
                     configs=measure_audio_config_list,
                     folders=measure_folder_list,
                     zero_delay=False,
@@ -869,6 +876,7 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
             else:
                 read_ir_samples(
                     data=sofa.Data_IR,
+                    data_delay=sofa.Data_Delay,
                     configs=measure_audio_config_list,
                     folders=measure_folder_list,
                     zero_delay=True,
