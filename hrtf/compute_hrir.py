@@ -36,7 +36,7 @@ _MAX_MEM_GB = 3.5  # max amount of memory for each compute process
 # IR WINDOW FILTER, values in seconds
 _IR_WINDOW_FADEIN_s = 0.002
 _IR_WINDOW_FADEOUT_s = 0.002
-_IR_WINDOW_LENGTH_s = 0.5
+_IR_WINDOW_LENGTH_s = 1.0
 
 # IR_INFO for pyfar data storage
 _IR_INFO_DELAY = 0

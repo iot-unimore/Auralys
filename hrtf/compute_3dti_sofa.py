@@ -135,6 +135,22 @@ def compute_delay_adj(data=None, idx=0):
 
     return i
 
+def compute_delay_offset(data=None, idx=0, sr=96000, offset=0.0001):
+    adata = abs(data)
+
+    peak_idx = idx
+
+    if peak_idx == 0:
+        peak_idx = np.argmax(adata)
+
+    # must be multiple of 2
+    offset_samples = int(offset * sr) /2
+    offset_samples = offset_samples * 2
+
+    if(offset_samples < peak_idx):
+        peak_idx = peak_idx - offset_samples
+
+    return int(peak_idx)
 
 def read_ir_delays(data=None, configs=None, folders=None, receivers_list=None):
     global _CTRL_EXIT_SIGNAL
@@ -247,10 +263,11 @@ def read_ir_sample(params):
                 # retrieve info from file processing, 3DTune-In requires zero-delay aligned files!!
                 ir_info = ir_pyfar["ir_info"]
                 ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
+                ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
 
                 # make sure we preserve the peak for the final IR
-                ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
-
+                # ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
+                ir_delay_samples = compute_delay_offset(data=ir_pyfar["ir_norm_hipass_window"].time[0], idx=ir_delay_samples, sr=ir_samplerate, offset=0.0001)
                 ir_len = ir_pyfar["ir_norm_hipass_window"].n_samples
 
                 if ir_len > ir_delay_samples:
@@ -327,14 +344,13 @@ def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero
                     # retrieve info from file processing, 3DTune-In requires zero-delay aligned files!!
                     ir_info = ir_pyfar["ir_info"]
                     ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
+                    ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
 
                     # make sure we preserve the peak for the final IR
-                    # ir_delay_samples = np.argmax(np.abs(ir_pyfar["ir_norm_hipass_window"].time[0]))
-                    # if ir_delay_samples > 4:
-                    #     ir_delay_samples -= 4
-
                     # ir_delay_samples = compute_delay(ir_pyfar["ir_norm_hipass_window"].time[0])
-                    ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
+                    # ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
+                    ir_delay_samples = compute_delay_offset(data=ir_pyfar["ir_norm_hipass_window"].time[0], idx=ir_delay_samples, sr=ir_samplerate, offset=0.0001)
+
                     ir_len = ir_pyfar["ir_norm_hipass_window"].n_samples
 
                     if ir_len > ir_delay_samples:
