@@ -47,19 +47,25 @@
 # split sofa in multiple "FreeField" binaural impulse responses, one sofa file for each
 # configuration of the wilso_prj microphones (binaura, array_six|front|middle|read)
 
-# compute non-zero-delay (for 3Dti tool) with small ir window to cut reverberations
-# IR Peak Delays are kept in sofa user variable IRPeakDelay
+# 3DTuneIn requires IR to be aligned on the direct_path peak to allow HRTF interpolation.
+# The "zero-delay" option will write the IR delays in DataDelay of the SOFA file,
+# removing the time delay from the IR array.We use a small ir window to cut reverberations
+# IR Peak Delays are also kept in sofa user variable IRPeakDelay
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s binaural
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s array_six,front
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s array_six,middle
+./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s array_six,rear
+
+# Non zero-delay: use this only if you want to keep the delay as part of the IR response.
+# note: this is not optimal for 3DTuneIn since it will cause comb filtering effect when the
+# HRTF interpolation is enabled (check if you disabled the option). 
+# We use a small ir window to cut reverberations.
+# IR Peak Delays are also kept in sofa user variable IRPeakDelay
 ./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -s binaural
 ./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -s array_six,front
 ./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -s array_six,middle
 ./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -s array_six,rear
 
-# compute zero-delay (not for 3Dti tool!), use a small ir window to cut reverberations
-# IR are cut to zero and each delay is written in sofa Data_Delay variable
-./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s binaural
-./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s array_six,front
-./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s array_six,middle
-./compute_3dti_sofa.py -v -c 88 -mf ./measures/dry-20250123_002/ -irw 0.015 -z -s array_six,rear
 
 # these 3dti sofa files will be generated
 # ./measures/dry-20250123_002/dry-20250123_002_binaural.sofa
