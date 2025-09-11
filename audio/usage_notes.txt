@@ -1,0 +1,3 @@
+# example to run muxer on audio recording folder
+
+./muxAudioMKV.py -r -v -c 16 -d 0.0008 -i /media/gfilippi/bigdata_01/auralys_measures/test

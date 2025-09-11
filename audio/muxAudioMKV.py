@@ -10,7 +10,6 @@ import asyncio
 import yaml
 
 import numpy as np
-import sounddevice as sd
 import soundfile as sf
 import queue
 import logging
@@ -51,6 +50,10 @@ _APLAY_EXE = "/usr/bin/aplay"
 _MIN_CPU_COUNT = 1  # we need at least one CPU for each compute process
 _MIN_MEM_GB = 0.2  # min amount of memory for each compute process
 _MAX_MEM_GB = 0.2  # max amount of memory for each compute process
+
+#
+# extra delay to be added to the reference audio track to compensate for audio dsp chain delay
+_DSP_AUDIO_DELAY = 0
 
 ########################################################################################################################
 #  DO NOT MODIFY CODE BELOW THIS LINE
@@ -188,11 +191,33 @@ def audiomux_wav_to_mkv(audiofile=None, mux_pattern=[2,[14,15],[16,17],[18,19],[
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)        
         os.system(" ".join(cmd))
 
-        logger.info("MUXING MKV {}".format(in_filename))
+        # DSP delay compensation
         file_in=os.path.join(tmpdir, f_name+"_"+str(2)+".wav")
+        data, samplerate = sf.read(file_in)
+        num_samples = data.shape[0]
+        delay_samples = _DSP_AUDIO_DELAY * samplerate / 2
+        delay_samples = int(round(delay_samples *2))
+
+        # create delay array
+        if data.ndim == 1:
+            # Mono audio
+            delay = np.zeros(delay_samples, dtype=data.dtype)
+        else:
+            # Stereo or multichannel
+            delay = np.zeros((delay_samples, data.shape[1]), dtype=data.dtype)
+
+        # add delay
+        new_data = np.concatenate((delay, data), axis=0)
+        new_data = new_data[:num_samples]
+        # write out
+        file_in=os.path.join(tmpdir, f_name+"_"+str(2)+"_dsp.wav")
+        sf.write(file_in, new_data, samplerate)
+
+        logger.info("MUXING MKV {}".format(in_filename))
+        file_in=os.path.join(tmpdir, f_name+"_"+str(2)+"_dsp.wav")
         file_out= os.path.join(f_path, f_name+".mkv")
         cmd=[_FFMPEG_EXE,"-y","-loglevel","error","-stats",
-            "-i", str(file_in),
+            "-i",str(file_in),
             "-i",str(os.path.join(tmpdir, f_name+"_binaural.wav")),
             "-i",str(os.path.join(tmpdir, f_name+"_array_six_front.wav")),
             "-i",str(os.path.join(tmpdir, f_name+"_array_six_middle.wav")),
@@ -342,6 +367,13 @@ if __name__ == "__main__":
         required=False,
         help="maximum number of CPU process to use",
     )    
+    parser.add_argument(
+        "-d",
+        "--dsp_delay",
+        type=float,
+        default="0.0",
+        help="dsp audio delay to be added to the audio source track (default: %(default)s seconds)",
+    )
 
     args, remaining = parser.parse_known_args()
 
@@ -352,6 +384,13 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.INFO)
     else:
         logging.basicConfig(level=logging.WARNING)
+
+
+    #
+    # DSP delay for playback timing compensation
+    #
+    if ( args.dsp_delay != 0 ):
+        _DSP_AUDIO_DELAY = float(args.dsp_delay)
 
     #
     # mux
