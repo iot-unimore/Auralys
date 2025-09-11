@@ -235,8 +235,6 @@ def compute_hrir(folder=None):
         offset = int(samplerate*_DSP_AUDIO_DELAY) / 2
         offset = int(offset *2)
 
-        print(offset)
-
         # shift source track for dsp delay
         data[offset:, tx_track_id] = data[:(samples-offset), tx_track_id]
 
@@ -937,7 +935,7 @@ if __name__ == "__main__":
     args1 = []
     args = []
 
-    if ( yaml_params["graphs"] != 0 ):
+    if ( yaml_params["dsp_delay"] != 0 ):
         _DSP_AUDIO_DELAY = float(yaml_params["dsp_delay"])
 
     #
