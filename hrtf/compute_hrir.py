@@ -57,6 +57,10 @@ receivers_pairs = ["binaural", "array_six,front", "array_six,middle", "array_six
 
 _SOUND_SPEED = 343  # m/s
 
+#
+# extra delay to be added to the reference audio track to compensate for audio dsp chain delay
+_DSP_AUDIO_DELAY = 0
+
 
 #
 # TOOLS
@@ -220,6 +224,22 @@ def compute_hrir(folder=None):
     data, samplerate = sf.read(str(folder) + "/" + audio_file + "." + audio_file_ext)
     fs = samplerate
 
+    samples = len(data)
+
+    # add DSP delay to the TX track if needed
+    # this is to compensate for audio chain delays that are happening AFTER
+    # point of measure (like a DSP/equalizer and digital amplifier)
+    if(_DSP_AUDIO_DELAY !=0):
+        logger.info("compute hrir: DSP Delay compensation: {} s, {} samples @{} Hz".format(_DSP_AUDIO_DELAY, int(samplerate*_DSP_AUDIO_DELAY), samplerate ))
+
+        offset = int(samplerate*_DSP_AUDIO_DELAY) / 2
+        offset = int(offset *2)
+
+        print(offset)
+
+        # shift source track for dsp delay
+        data[offset:, tx_track_id] = data[:(samples-offset), tx_track_id]
+
     logger.info("compute hrir: source " + source_position_str + ", Duration: " + str(len(data) / fs) + "(s)")
     logger.info(
         "compute hrir: source "
@@ -229,7 +249,6 @@ def compute_hrir(folder=None):
         + "(Mbytes)"
     )
 
-    samples = len(data)
 
     #
     # correlate and compute padding-pre sweep / recording latency
@@ -822,6 +841,12 @@ if __name__ == "__main__":
             type=str,
             help="skip, save, show, show_and_save",
         )
+        parser.add_argument(
+            "-d",
+            "--dsp_delay",
+            type=float,
+            help="dsp audio delay to be added to the audio source track",
+        )
 
     #
     # no config, use defaults
@@ -850,6 +875,13 @@ if __name__ == "__main__":
             type=str,
             default="skip",
             help="skip, save, show, show_and_save (default: %(default)s)",
+        )
+        parser.add_argument(
+            "-d",
+            "--dsp_delay",
+            type=float,
+            default="0.0",
+            help="dsp audio delay to be added to the audio source track (default: %(default)s seconds)",
         )
 
     parser.add_argument(
@@ -904,6 +936,9 @@ if __name__ == "__main__":
     #
     args1 = []
     args = []
+
+    if ( yaml_params["graphs"] != 0 ):
+        _DSP_AUDIO_DELAY = float(yaml_params["dsp_delay"])
 
     #
     # set graphs computation level

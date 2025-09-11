@@ -29,8 +29,8 @@
 
 
 # STEP-2
-# compute impulse responses on ALL recordings in a measure session
-./compute_hrir.py -v -c 44 -mf ./measures/dry-20250123_002
+# compute impulse responses on ALL recordings in a measure session, DSP_delay is 0.9ms
+./compute_hrir.py -v -c 44 -d 0.0009 -mf ./measures/dry-20250123_002
 
 
 # STEP-3 (optional)
