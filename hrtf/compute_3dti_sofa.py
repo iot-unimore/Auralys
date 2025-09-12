@@ -224,6 +224,7 @@ def read_ir_sample(params):
     samples_ir_window = params[5]
     sofa_data_ir = params[6]
     sofa_data_delay = params[7]
+    remove_direct_path = params[8]
 
     selection_list = range(config["setup"]["listeners"][0]["receivers_count"])
     if receivers_list != None:
@@ -254,6 +255,21 @@ def read_ir_sample(params):
         if ir_pyfar != None:
             # fetch impulse response in time domain
             if zero_delay == False:
+                if(remove_direct_path>0):
+                    # retrieve info from file processing
+                    ir_info = ir_pyfar["ir_info"]
+                    ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
+                    ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
+
+                    # TODO: apply windowing to the crossing point
+                    ir_null_samples = ir_delay_samples + int(round(ir_samplerate*remove_direct_path))
+                    ir_samples = len(ir_pyfar["ir_norm_hipass_window"].time[0])
+
+                    if(ir_samples < ir_null_samples):
+                        ir_null_samples = ir_samples
+
+                    ir_pyfar["ir_norm_hipass_window"].time[0][0:ir_null_samples] = np.zeros(ir_null_samples)
+
                 if receivers_list != None:
                     sofa_data_ir[i, idx, :] = ir_pyfar["ir_norm_hipass_window"].time[0][0:samples_ir_window]
                 else:
@@ -298,7 +314,7 @@ def read_ir_sample(params):
         idx += 1
 
 
-def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero_delay=False, receivers_list=None, samples_ir_window=0):
+def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero_delay=False, receivers_list=None, samples_ir_window=0, remove_direct_path=0.0):
     global _CTRL_EXIT_SIGNAL
 
     err = 0
@@ -335,6 +351,21 @@ def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero
             if ir_pyfar != None:
                 # fetch impulse response in time domain
                 if zero_delay == False:
+                    if(remove_direct_path>0):
+                        # retrieve info from file processing
+                        ir_info = ir_pyfar["ir_info"]
+                        ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
+                        ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
+
+                        # TODO: apply windowing to the crossing point
+                        ir_null_samples = ir_delay_samples + int(round(ir_samplerate*remove_direct_path))
+                        ir_samples = len(ir_pyfar["ir_norm_hipass_window"].time[0])
+
+                        if(ir_samples < ir_null_samples):
+                            ir_null_samples = ir_samples
+
+                        ir_pyfar["ir_norm_hipass_window"].time[0][0:ir_null_samples] = np.zeros(ir_null_samples)
+
                     if receivers_list != None:
                         data[i, idx, :] = ir_pyfar["ir_norm_hipass_window"].time[0][0:samples_ir_window]
                     else:
@@ -862,6 +893,7 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
                         samples_ir_window,
                         sofa.Data_IR,
                         sofa.Data_Delay,
+                        float(yaml_params["remove_direct_path"]),
                     )
                 )
 
@@ -879,27 +911,16 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
 
             sofa.Data_IR = np.zeros((measures_M, receivers_R, samples_ir_window))
 
-            if yaml_params["zero_delay"] == False:
-                read_ir_samples(
-                    data=sofa.Data_IR,
-                    data_delay=sofa.Data_Delay,
-                    configs=measure_audio_config_list,
-                    folders=measure_folder_list,
-                    zero_delay=False,
-                    receivers_list=receivers_list,
-                    samples_ir_window=samples_ir_window,
-                )
-            else:
-                read_ir_samples(
-                    data=sofa.Data_IR,
-                    data_delay=sofa.Data_Delay,
-                    configs=measure_audio_config_list,
-                    folders=measure_folder_list,
-                    zero_delay=True,
-                    receivers_list=receivers_list,
-                    samples_ir_window=samples_ir_window,
-                )
-
+            read_ir_samples(
+                data=sofa.Data_IR,
+                data_delay=sofa.Data_Delay,
+                configs=measure_audio_config_list,
+                folders=measure_folder_list,
+                zero_delay=bool(yaml_params["zero_delay"]),
+                receivers_list=receivers_list,
+                samples_ir_window=samples_ir_window,
+                remove_direct_path=float(yaml_params["remove_direct_path"])
+            )
     #
     # WRITE OUTPUT FILE
     #
@@ -1041,6 +1062,12 @@ if __name__ == "__main__":
             help="remove IR delay for 3D_TuneIn_Toolkit",
         )
         parser.add_argument(
+            "-r",
+            "--remove_direct_path",
+            type=float,
+            help="remove direct_path for 3D_TuneIn_Toolkit",
+        )
+        parser.add_argument(
             "-irw",
             "--ir_window",
             type=float,
@@ -1086,7 +1113,14 @@ if __name__ == "__main__":
             "--zero_delay",
             action="store_true",
             default=False,
-            help="remove IR delay for 3D_TuneIn_Toolkit",
+            help="remove IR delay for 3D_TuneIn_Toolkit (default: %(default)s)",
+        )
+        parser.add_argument(
+            "-r",
+            "--remove_direct_path",
+            type=float,
+            default=0.0,
+            help="remove direct_path for 3D_TuneIn_Toolkit (default: %(default)s) s",
         )
         parser.add_argument(
             "-irw",
@@ -1188,6 +1222,13 @@ if __name__ == "__main__":
     #
     if yaml_params["measure_folder"] == None:
         sys.exit("\n[ERROR] missing measure folder.")
+
+    #
+    # remove_direct_path not to be used with zero_delay
+    #
+    if ( yaml_params["zero_delay"] == True ) and ( yaml_params["remove_direct_path"] > 0.0 ):
+        sys.exit("\n[ERROR] zero_delay cannot be used when removing direct path for 3D_TuneIn_Toolkit")
+
 
     # audio recording format
     audio_recording = None
