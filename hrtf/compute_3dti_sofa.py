@@ -255,21 +255,6 @@ def read_ir_sample(params):
         if ir_pyfar != None:
             # fetch impulse response in time domain
             if zero_delay == False:
-                if(remove_direct_path>0):
-                    # retrieve info from file processing
-                    ir_info = ir_pyfar["ir_info"]
-                    ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
-                    ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
-
-                    # TODO: apply windowing to the crossing point
-                    ir_null_samples = ir_delay_samples + int(round(ir_samplerate*remove_direct_path))
-                    ir_samples = len(ir_pyfar["ir_norm_hipass_window"].time[0])
-
-                    if(ir_samples < ir_null_samples):
-                        ir_null_samples = ir_samples
-
-                    ir_pyfar["ir_norm_hipass_window"].time[0][0:ir_null_samples] = np.zeros(ir_null_samples)
-
                 if receivers_list != None:
                     sofa_data_ir[i, idx, :] = ir_pyfar["ir_norm_hipass_window"].time[0][0:samples_ir_window]
                 else:
@@ -280,6 +265,7 @@ def read_ir_sample(params):
                 ir_info = ir_pyfar["ir_info"]
                 ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
                 ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
+                ir_samples = len(ir_pyfar["ir_norm_hipass_window"].time[0])
 
                 # make sure we preserve the peak for the final IR
                 # ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
@@ -291,6 +277,14 @@ def read_ir_sample(params):
                     tmp = ir_len - ir_delay_samples
                     if tmp > samples_ir_window:
                         tmp = samples_ir_window
+
+                    if(remove_direct_path>0):
+                        # TODO: apply windowing to the crossing point
+                        ir_null_samples = ir_delay_samples + int(round(ir_samplerate*remove_direct_path))
+                        if(ir_samples < ir_null_samples):
+                            ir_null_samples = ir_samples
+                        # erase direct path wave
+                        ir_pyfar["ir_norm_hipass_window"].time[0][0:ir_null_samples] = np.zeros(ir_null_samples)
 
                     if receivers_list != None:
                         sofa_data_ir[i, idx, 0:tmp] = ir_pyfar["ir_norm_hipass_window"].time[0][
@@ -351,21 +345,6 @@ def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero
             if ir_pyfar != None:
                 # fetch impulse response in time domain
                 if zero_delay == False:
-                    if(remove_direct_path>0):
-                        # retrieve info from file processing
-                        ir_info = ir_pyfar["ir_info"]
-                        ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
-                        ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
-
-                        # TODO: apply windowing to the crossing point
-                        ir_null_samples = ir_delay_samples + int(round(ir_samplerate*remove_direct_path))
-                        ir_samples = len(ir_pyfar["ir_norm_hipass_window"].time[0])
-
-                        if(ir_samples < ir_null_samples):
-                            ir_null_samples = ir_samples
-
-                        ir_pyfar["ir_norm_hipass_window"].time[0][0:ir_null_samples] = np.zeros(ir_null_samples)
-
                     if receivers_list != None:
                         data[i, idx, :] = ir_pyfar["ir_norm_hipass_window"].time[0][0:samples_ir_window]
                     else:
@@ -376,6 +355,7 @@ def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero
                     ir_info = ir_pyfar["ir_info"]
                     ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
                     ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
+                    ir_samples = len(ir_pyfar["ir_norm_hipass_window"].time[0])
 
                     # make sure we preserve the peak for the final IR
                     # ir_delay_samples = compute_delay(ir_pyfar["ir_norm_hipass_window"].time[0])
@@ -389,6 +369,15 @@ def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero
                         tmp = ir_len - ir_delay_samples
                         if tmp > samples_ir_window:
                             tmp = samples_ir_window
+
+                        if(remove_direct_path>0):
+                            # TODO: apply windowing to the crossing point
+                            ir_null_samples = ir_delay_samples + int(round(ir_samplerate*remove_direct_path))
+                            if(ir_samples < ir_null_samples):
+                                ir_null_samples = ir_samples
+                            # erase direct path wave
+                            ir_pyfar["ir_norm_hipass_window"].time[0][0:ir_null_samples] = np.zeros(ir_null_samples)
+
 
                         if receivers_list != None:
                             data[i, idx, 0:tmp] = ir_pyfar["ir_norm_hipass_window"].time[0][
@@ -1224,11 +1213,11 @@ if __name__ == "__main__":
         sys.exit("\n[ERROR] missing measure folder.")
 
     #
-    # remove_direct_path not to be used with zero_delay
+    # remove_direct_path must to be used with zero_delay
     #
-    if ( yaml_params["zero_delay"] == True ) and ( yaml_params["remove_direct_path"] > 0.0 ):
-        sys.exit("\n[ERROR] zero_delay cannot be used when removing direct path for 3D_TuneIn_Toolkit")
-
+    if ( yaml_params["zero_delay"] == False ) and ( yaml_params["remove_direct_path"] > 0.0 ):
+        logger.info("BRIR computation with direct path removal requires zero_delay. enabling zero_delay option.")
+        yaml_params["zero_delay"] = True
 
     # audio recording format
     audio_recording = None
