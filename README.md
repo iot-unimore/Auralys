@@ -2,4 +2,4 @@
 
 Auralys = Auris + Analysis
 
-Auralys is an automated system focusing on room impulse response computation and multi-microphones array for wearable devices.
+Auralys is an automated system focusing on HRTF (head related transfer function) and RIR (room impulse response) measure & computation with multi-microphones array for wearable devices.
