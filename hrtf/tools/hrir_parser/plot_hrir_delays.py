@@ -56,7 +56,7 @@ def plot_data(files, title):
             df = pd.read_csv(file)
             plt.plot(df['azimuth'], df['delay'], label=os.path.basename(file))
         except Exception as e:
-            print(f"⚠️ Failed to load {file}: {e}")
+            print(f"Failed to load {file}: {e}")
     plt.xlabel('Azimuth (degrees)')
     plt.ylabel('Delay')
     plt.title(title)
@@ -73,10 +73,10 @@ def main():
         files = find_files_regex(args.root, args.pattern)
 
     if not files:
-        print(f"❌ No files matched the pattern using mode '{args.mode}'.")
+        print(f"No files matched the pattern using mode '{args.mode}'.")
         return
 
-    print(f"✅ Matched {len(files)} file(s):")
+    print(f"Matched {len(files)} file(s):")
     for f in files:
         print(f"  {f}")
 
@@ -84,7 +84,7 @@ def main():
 
     if args.save:
         plt.savefig(args.save)
-        print(f"💾 Plot saved to {args.save}")
+        print(f"Plot saved to {args.save}")
     else:
         plt.show()
 
