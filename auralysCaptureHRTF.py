@@ -160,6 +160,10 @@ if __name__ == "__main__":
     # ESS mapping
     #
     idx = 0
+
+    # elevations whose ESS map did not complete: reported at the end with a non-zero exit code
+    failed_elevations = []
+
     for row in auralysPositions:
         print("==============================================================")
         position = str(row[1]) + ",0," + str(row[2])
@@ -167,7 +171,7 @@ if __name__ == "__main__":
         print("==============================================================")
 
         # move speaker in position
-        rv = subprocess.run(["./auralysSpeaker/cli/auralys_ctrl.py","-c","set","position","-p",str(position),"-rs",str(-1 * int(row[0])),"-t","ac","-v",],stdout=subprocess.PIPE).stdout.decode("utf-8")
+        rv = subprocess.run([_AURALIS_DIR+"/cli/auralys_ctrl.py","-c","set","position","-p",str(position),"-rs",str(-1 * int(row[0])),"-t","ac","-v",],stdout=subprocess.PIPE).stdout.decode("utf-8")
 
         # wait for stabilization of the speaker
         time.sleep(3)
@@ -191,7 +195,7 @@ if __name__ == "__main__":
         # update params for new elevation
         #
         update_ess_map_params(
-            "./hrtf/ess_map_params.yaml", "/tmp/ess_map_params.yaml", str(row[0]), str(row[0]), hw_rec_idx, hw_play_idx
+            _HRTF_DIR+"/ess_map_params.yaml", "/tmp/ess_map_params.yaml", str(row[0]), str(row[0]), hw_rec_idx, hw_play_idx
         )
 
         #
@@ -209,9 +213,9 @@ if __name__ == "__main__":
 
         # step 10 deg, SWEEP
         # rv = subprocess.run(["./hrtf/record_ess_map.py","-v","-yp","/tmp/ess_map_params.yaml","-yc" ,"./hrtf/ess_params.yaml","-ab","360","-ae","5","-as","-10","-m","/media/gfilippi/audiodata/wilsonClean_20250809-001","-n","wilsonClean"], stdout=subprocess.PIPE).stdout.decode("utf-8")
-        rv = subprocess.run(
+        proc = subprocess.run(
             [
-                "./hrtf/record_ess_map.py",
+                _HRTF_DIR+"/record_ess_map.py",
                 "-v",
                 "-yp",
                 "/tmp/ess_map_params.yaml",
@@ -224,15 +228,26 @@ if __name__ == "__main__":
                 "-as",
                 str(_AZIMUTH_STEP),
                 "-m",
-                "/media/gfilippi/audiodata/wilsonClean_20250809-001",
+                # "/media/gfilippi/audiodata/wilsonClean_20250809-001",
+                "/media/gfilippi/audiodata/wilsonPippo",
                 "-n",
                 "wilsonClean",
-                "-t",
+                # "-t", #dry-run, no audio recording
             ],
             stdout=subprocess.PIPE,
-        ).stdout.decode("utf-8")
+        )
+        rv = proc.stdout.decode("utf-8")
+
+        # record_ess_map exits non-zero on an incomplete map: do not silently move to the next elevation
+        if proc.returncode != 0:
+            print(rv)
+            print("[ERROR] record_ess_map failed (exit {}) at elevation {} deg".format(proc.returncode, row[0]))
+            failed_elevations.append(row[0])
 
     time.sleep(3)
 
     # back to zero position: speaker & table
-    rv = subprocess.run(["./auralysSpeaker/cli/auralys_ctrl.py", "-c", "cmd", "gozero", "-rs", "0", "-rt", "0", "-v"],stdout=subprocess.PIPE).stdout.decode("utf-8")
+    rv = subprocess.run([_AURALIS_DIR+"/cli/auralys_ctrl.py", "-c", "cmd", "gozero", "-rs", "0", "-rt", "0", "-v"],stdout=subprocess.PIPE).stdout.decode("utf-8")
+
+    if failed_elevations:
+        sys.exit("\n[ERROR] incomplete HRTF capture, failed elevations (deg): {}".format(failed_elevations))

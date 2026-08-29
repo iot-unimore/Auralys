@@ -98,7 +98,8 @@ async def play_silence(
         try:
             sd.check_output_settings(device=device, samplerate=48000)
         except:
-            logger.error("unsupported audio playback format 48k")
+            # informational only: nothing here plays at 48k, the device is clocked at "samplerate"
+            logger.debug("unsupported audio playback format 48k")
 
         # playback stream
         stream = sd.OutputStream(device=device, channels=2, samplerate=samplerate, callback=silence_callback, **kwargs)
@@ -111,10 +112,15 @@ async def play_silence(
             await event.wait()
 
     except KeyboardInterrupt:
-        parser.exit("")
+        # standalone CLI: terminate. imported as a module: let the caller decide.
+        if cli:
+            sys.exit("")
+        raise
 
     except Exception as e:
-        parser.exit(type(e).__name__ + ": " + str(e))
+        if cli:
+            sys.exit(type(e).__name__ + ": " + str(e))
+        raise
 
     logger.info("play_silence. done.")
 
@@ -235,7 +241,8 @@ async def play_expsweep(
         try:
             sd.check_output_settings(device=device, samplerate=48000)
         except:
-            logger.error("unsupported audio playback format 48k")
+            # informational only: nothing here plays at 48k, the device is clocked at "samplerate"
+            logger.debug("unsupported audio playback format 48k")
 
         # playback stream
         stream = sd.OutputStream(device=device, channels=2,  blocksize=10240, samplerate=samplerate, callback=ess_callback, **kwargs)
@@ -248,10 +255,15 @@ async def play_expsweep(
             await event.wait()
 
     except KeyboardInterrupt:
-        parser.exit("")
+        # standalone CLI: terminate. imported as a module: let the caller decide.
+        if cli:
+            sys.exit("")
+        raise
 
     except Exception as e:
-        parser.exit(type(e).__name__ + ": " + str(e))
+        if cli:
+            sys.exit(type(e).__name__ + ": " + str(e))
+        raise
 
     logger.info("play_ess. done.")
 
@@ -284,7 +296,7 @@ async def record_audio(
             audio_file = sf.SoundFile(
                 measure_folder + "/" + measure_name + "/sweep_" + str(playback_repeat) + ".wav",
                 mode="w",
-                samplerate=96000,
+                samplerate=samplerate,
                 channels=22,
                 subtype="PCM_24",
             )
@@ -312,10 +324,15 @@ async def record_audio(
         audio_file.close()
 
     except KeyboardInterrupt:
-        parser.exit("")
+        # standalone CLI: terminate. imported as a module: let the caller decide.
+        if cli:
+            sys.exit("")
+        raise
 
     except Exception as e:
-        parser.exit(type(e).__name__ + ": " + str(e))
+        if cli:
+            sys.exit(type(e).__name__ + ": " + str(e))
+        raise
 
     logger.info("record_audio. done.")
 
@@ -328,7 +345,7 @@ async def playrecord(cli=False, **kwargs):
 
     # preamble with silence for RME sync
     event.clear()
-    asyncio.gather(
+    await asyncio.gather(
         record_audio(
             event=event,
             device=kwargs["input_device"],
@@ -347,12 +364,11 @@ async def playrecord(cli=False, **kwargs):
             cli=cli,
         ),
     )
-    await event.wait()
 
     for r in range(kwargs["playback_repeat"]):
         event.clear()
 
-        asyncio.gather(
+        await asyncio.gather(
             record_audio(
                 event=event,
                 device=kwargs["input_device"],
@@ -375,8 +391,6 @@ async def playrecord(cli=False, **kwargs):
                 cli=cli,
             ),
         )
-
-        await event.wait()
 
 
 def run_main(**kwargs):

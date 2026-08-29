@@ -517,6 +517,9 @@ if __name__ == "__main__":
         elevation_current = yaml_params["elevation_begin"]
         distance_current = yaml_params["distance_begin"]
 
+        # angles we could not record: the sweep keeps going, we report them at the end
+        failed_angles = []
+
         for angle in range(yaml_params["azimuth_begin"], yaml_params["azimuth_end"] + 1, yaml_params["azimuth_step"]):
             # sanity checks input params:
 
@@ -589,9 +592,23 @@ if __name__ == "__main__":
                 time.sleep(1)
 
                 if not (yaml_params["test"]):
-                    record_ess.run_main(**yaml_params)
+                    try:
+                        record_ess.run_main(**yaml_params)
+                    except Exception as e:
+                        logger.error(
+                            "[ERROR]: recording failed, angle={}: {}: {}".format(angle_adj, type(e).__name__, str(e))
+                        )
+                        failed_angles.append(angle_adj)
             else:
                 logger.error("[ERROR]: cannot set rotating table position, angle={}".format(angle_adj))
+                failed_angles.append(angle_adj)
 
     except KeyboardInterrupt:
         sys.exit("\nInterrupted by user")
+
+    if failed_angles:
+        sys.exit(
+            "\n[ERROR] incomplete ESS map: {} of {} angles failed: {}".format(
+                len(failed_angles), len(range(yaml_params["azimuth_begin"], yaml_params["azimuth_end"] + 1, yaml_params["azimuth_step"])), failed_angles
+            )
+        )

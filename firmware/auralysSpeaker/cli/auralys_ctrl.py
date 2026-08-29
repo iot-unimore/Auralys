@@ -126,6 +126,26 @@ _TABLE_ROTATION_STEP_MAX = _TABLE_ROTATION_MAX * mks_T_step_deg
 _TABLE_ROTATION_STEP_MIN = _TABLE_ROTATION_MIN * mks_T_step_deg
 
 
+# http/positioning timeouts
+# (connect, read) timeout for every request towards a unit: a unit that stops
+# answering must fail fast instead of blocking the caller forever.
+# the read timeout must stay above the 5s the firmware allows itself per client
+# (httpTimeoutTime2S), otherwise we give up on a unit that is merely slow
+_MKS_HTTP_TIMEOUT = (3, 8)
+
+# a unit can stop answering for a few seconds while its firmware is busy:
+# retry before declaring it dead, instead of aborting the whole measurement run
+_MKS_HTTP_RETRY = 3
+_MKS_HTTP_RETRY_DELAY_S = 2
+
+# status polling: start fast then back off. every poll is a brand new TCP
+# connection on the unit, and the units have very few sockets available
+_MKS_POLL_MAX_S = 5
+
+# give up on a move that never reports "in position"
+_MKS_MOVE_TIMEOUT_S = 300
+
+
 #
 # Tools
 #
@@ -188,9 +208,37 @@ def verify_coord_cartesian_limits(x, y, z):
     return 0
 
 
+def mks_http_request(url, data=None):
+    """GET (data=None) or POST a unit, retrying a few times on network errors."""
+    last_error = None
+
+    for attempt in range(1, _MKS_HTTP_RETRY + 1):
+        try:
+            if data is None:
+                return requests.get(url, timeout=_MKS_HTTP_TIMEOUT)
+
+            return requests.post(url, data=data, timeout=_MKS_HTTP_TIMEOUT)
+
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            last_error = e
+
+            logger.warning(
+                "mks_http_request: {} failed, attempt {}/{}: {}".format(
+                    url, attempt, _MKS_HTTP_RETRY, type(e).__name__
+                )
+            )
+
+            if attempt < _MKS_HTTP_RETRY:
+                time.sleep(_MKS_HTTP_RETRY_DELAY_S * attempt)
+
+    logger.error("mks_http_request: {} unreachable after {} attempts.".format(url, _MKS_HTTP_RETRY))
+
+    raise last_error
+
+
 def mks_set_length(ip_addr, mks_length):
     url = "http://" + str(ip_addr) + "/position/set/"
-    response = requests.post(url, data=str(int(mks_length)))
+    response = mks_http_request(url, data=str(int(mks_length)))
     result = json.loads(response.text)
     if result["error"] != 0:
         return -1
@@ -200,9 +248,21 @@ def mks_set_length(ip_addr, mks_length):
 
 def mks_get_status(ip_addr, option):
     url = "http://" + str(ip_addr) + "/status/get/"
-    response = requests.get(url)
+    response = mks_http_request(url)
 
     result = json.loads(response.text)
+
+    # memory health, only reported by units running a recent firmware
+    if "heap" in result:
+        logger.info(
+            "mks_get_status: {} uptime: {}s, heap: {} bytes, largest block: {} bytes".format(
+                ip_addr,
+                int(result.get("uptime_ms", 0) / 1000),
+                result["heap"],
+                result.get("heap_max_block", "n/a"),
+            )
+        )
+
     if result["error"] != 0:
         return -1
 
@@ -211,7 +271,7 @@ def mks_get_status(ip_addr, option):
 
 def mks_set_zero(ip_addr, option):
     url = "http://" + str(ip_addr) + "/position/zero/set/"
-    response = requests.post(url, data=str(int(option)))
+    response = mks_http_request(url, data=str(int(option)))
     result = json.loads(response.text)
     if result["error"] != 0:
         return -1
@@ -221,7 +281,7 @@ def mks_set_zero(ip_addr, option):
 
 def mks_get_inclinometer(ip_addr, option):
     url = "http://" + str(ip_addr) + "/status/get/"
-    response = requests.get(url)
+    response = mks_http_request(url)
 
     result = json.loads(response.text)
     if result["error"] != 0:
@@ -237,7 +297,11 @@ def mks_rotate_table(mks_degree):
         position_step *= -1
 
     if (position_step > _TABLE_ROTATION_STEP_MIN) and (position_step < _TABLE_ROTATION_STEP_MAX):
-        mks_set_position(ip_addr_T, int(position_step))
+        return mks_set_position(ip_addr_T, int(position_step))
+
+    logger.error("mks_rotate_table: rotation outside of limits")
+
+    return -1
 
 
 def mks_rotate_speaker(mks_degree):
@@ -279,7 +343,11 @@ def mks_rotate_speaker(mks_degree):
         position_step *= -1
 
     if (position_step > _SPEAKER_ROTATION_STEP_MIN) and (position_step < _SPEAKER_ROTATION_STEP_MAX):
-        mks_set_position(ip_addr_S, position_step)
+        return mks_set_position(ip_addr_S, position_step)
+
+    logger.error("mks_rotate_speaker: rotation outside of limits")
+
+    return -1
 
 
 def mks_set_position(ip_addr, mks_position):
@@ -307,24 +375,40 @@ def mks_set_position(ip_addr, mks_position):
 
     #########
     # STEP #2: monitor & wait until position is done
-    logger.info("mks_set_position: wait/veryfy position completed.")
+    logger.info("mks_set_position: wait/verify position completed.")
+
+    rv = -1
 
     if err == 0:
-        status = 1
-        while (status != 0) and (status != -1):
-            time.sleep(1)
+        delay = 1
+        deadline = time.monotonic() + _MKS_MOVE_TIMEOUT_S
+        timed_out = True
+
+        while time.monotonic() < deadline:
+            time.sleep(delay)
+
+            # back off gradually: every poll costs the unit a new connection
+            delay = min(_MKS_POLL_MAX_S, delay + 1)
 
             status = mks_get_status(ip_addr, 0)
 
             if status == -1:
-                logger.error("mks_set_position: error while positioning.")
-            else:
-                logger.info("mks_set_position: positioning done.")
+                logger.error("mks_set_position: error while positioning, unit {}".format(ip_addr))
+                timed_out = False
+                break
 
-    # return negative on error. zero on position completed
-    rv = 0
-    if status != 0:
-        rv = -1
+            if status == 0:
+                logger.info("mks_set_position: positioning done.")
+                timed_out = False
+                rv = 0
+                break
+
+        if timed_out:
+            logger.error(
+                "mks_set_position: timeout after {}s, unit {} did not reach position".format(
+                    _MKS_MOVE_TIMEOUT_S, ip_addr
+                )
+            )
 
     return rv
 
@@ -340,15 +424,10 @@ def mks_set_positions(mks_position_F, mks_position_L, mks_position_R):
     # STEP #0: GET current position and verify status
     logger.info("mks_set_positions: get current status.")
 
-    task_args = [(ip_addr_F, mks_position_F), (ip_addr_L, mks_position_L), (ip_addr_R, mks_position_R)]
-
-    with multiprocessing.Pool(processes=3) as pool:
-        results = pool.starmap(mks_get_status, task_args)
-
-    # check result for errors
+    # a status read is a few milliseconds: done sequentially, no need to fork
     err = 0
-    for result in results:
-        err += result
+    for ip_addr in (ip_addr_F, ip_addr_L, ip_addr_R):
+        err += mks_get_status(ip_addr, 0)
 
     if err != 0:
         logger.error("mks_set_positions: error while executing GET POSITION")
@@ -372,33 +451,53 @@ def mks_set_positions(mks_position_F, mks_position_L, mks_position_R):
 
     #########
     # STEP #2: monitor & wait until position is done
-    logger.info("mks_set_positions: wait/veryfy position completed.")
+    logger.info("mks_set_positions: wait/verify position completed.")
 
-    task_args = [(ip_addr_F, mks_position_F), (ip_addr_L, mks_position_L), (ip_addr_R, mks_position_R)]
+    rv = -1
 
     if err == 0:
-        status = 1
-        while (status != 0) and (status != -1):
-            time.sleep(1)
+        # units still moving. each one is dropped from the poll list as soon as
+        # it reports IDLE, so we stop opening connections towards it
+        pending = {ip_addr_F: "F", ip_addr_L: "L", ip_addr_R: "R"}
 
-            with multiprocessing.Pool(processes=3) as pool:
-                results = pool.starmap(mks_get_status, task_args)
+        delay = 1
+        deadline = time.monotonic() + _MKS_MOVE_TIMEOUT_S
+        failed = False
 
-            # check result for errors
-            result_sum = 0
-            for result in results:
-                if result == -1:
-                    logger.error("mks_set_positions: error while positioning.")
-                    status = -1
-                result_sum += result
-            if result_sum == 0:
-                logger.info("mks_set_positions: positioning done.")
-                status = 0
+        while pending and (time.monotonic() < deadline):
+            time.sleep(delay)
 
-    # return negative on error. zero on position completed
-    rv = 0
-    if status != 0:
-        rv = -1
+            # back off gradually: every poll costs each unit a new connection
+            delay = min(_MKS_POLL_MAX_S, delay + 1)
+
+            for ip_addr in list(pending):
+                status = mks_get_status(ip_addr, 0)
+
+                if status == -1:
+                    logger.error(
+                        "mks_set_positions: error while positioning, unit {} [{}]".format(pending[ip_addr], ip_addr)
+                    )
+                    failed = True
+                    break
+
+                if status == 0:
+                    logger.info("mks_set_positions: unit {} in position.".format(pending[ip_addr]))
+                    del pending[ip_addr]
+
+            if failed:
+                break
+
+        if failed:
+            rv = -1
+        elif pending:
+            logger.error(
+                "mks_set_positions: timeout after {}s, units still moving: {}".format(
+                    _MKS_MOVE_TIMEOUT_S, list(pending.values())
+                )
+            )
+        else:
+            logger.info("mks_set_positions: positioning done.")
+            rv = 0
 
     return rv
 
@@ -673,32 +772,45 @@ if __name__ == "__main__":
     # sanity checks to validate input params
     #
 
+    rv = 0
+
     if args.command != None:
         if args.command[0] == "set":
-            set_select(args)
+            rv = set_select(args)
         elif args.command[0] == "get":
-            get_select(args)
+            rv = get_select(args)
         elif args.command[0] == "cmd":
-            cmd_select(args)
+            rv = cmd_select(args)
         else:
             logger.error("Command invalid/unsupported.")
-            exit(0)
+            sys.exit(1)
     #
     # check for speaker rotation
     #
     if args.rspeaker:
         if (args.rspeaker[0] < _SPEAKER_ROTATION_MAX) and (args.rspeaker[0] > _SPEAKER_ROTATION_MIN):
-            mks_rotate_speaker(args.rspeaker[0])
+            if mks_rotate_speaker(args.rspeaker[0]) != 0:
+                rv = -1
         else:
             logger.error("speaker rotation outside of boundaries")
+            rv = -1
 
     #
     # check for rotating_table rotation
     #
     if args.rtable:
         if (args.rtable[0] < _TABLE_ROTATION_MAX) and (args.rtable[0] > _TABLE_ROTATION_MIN):
-            mks_rotate_table(args.rtable[0])
+            if mks_rotate_table(args.rtable[0]) != 0:
+                rv = -1
         else:
             logger.error("rotating-table rotation outside of boundaries")
+            rv = -1
 
     logger.info("done.")
+
+    #
+    # non-zero exit code on failure, so that the caller can detect it
+    #
+    if rv != 0:
+        logger.error("auralys_ctrl: command failed.")
+        sys.exit(1)
