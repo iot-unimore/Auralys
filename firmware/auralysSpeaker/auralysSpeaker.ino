@@ -50,7 +50,9 @@
 #include "esp_mac.h"
 
 #include <TimeLib.h>
-#include <Time.h>
+/* Time.h was only a compatibility shim for TimeLib.h and is gone from the */
+/* Time library since 1.6.x: TimeLib.h above is the real header.           */
+// #include <Time.h>
 #include <EEPROM.h>
 // #include "Timezone.h"
 

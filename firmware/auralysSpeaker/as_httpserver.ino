@@ -43,6 +43,11 @@ void httpServerLoop()
             req_content_length = -1;
             header_content_length = -1;
 
+            /* a request that never completed (client gave up, connection      */
+            /* dropped) must not leak into this one: "header" is a global and  */
+            /* is only cleared after a successful reply, so clear it here too. */
+            header = "";
+
             LOG_MSGLN("\n[HTTPSERVER] New Client.");
 
             if((httpCurrentTime - httpPreviousTime > httpTimeoutTime2S))
@@ -403,6 +408,9 @@ void httpServerLoop()
 
             client.clear();
             client.stop();
+
+            /* leave no stale request behind, whatever way we got here */
+            header = "";
         }
     }
 }
