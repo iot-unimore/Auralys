@@ -163,6 +163,7 @@ if __name__ == "__main__":
 
     # elevations whose ESS map did not complete: reported at the end with a non-zero exit code
     failed_elevations = []
+    gozero_failed = False
 
     for row in auralysPositions:
         print("==============================================================")
@@ -171,7 +172,17 @@ if __name__ == "__main__":
         print("==============================================================")
 
         # move speaker in position
-        rv = subprocess.run([_AURALIS_DIR+"/cli/auralys_ctrl.py","-c","set","position","-p",str(position),"-rs",str(-1 * int(row[0])),"-t","ac","-v",],stdout=subprocess.PIPE).stdout.decode("utf-8")
+        proc = subprocess.run([_AURALIS_DIR+"/cli/auralys_ctrl.py","-c","set","position","-p",str(position),"-rs",str(-1 * int(row[0])),"-t","ac","-v",],stdout=subprocess.PIPE)
+        rv = proc.stdout.decode("utf-8")
+
+        # positioning failed: the speaker is not where it should be, recording
+        # this elevation would only produce unusable measures
+        if proc.returncode != 0:
+            print(rv)
+            print("[ERROR] set position failed (exit {}) at elevation {} deg: elevation skipped".format(proc.returncode, row[0]))
+            failed_elevations.append(row[0])
+            idx += 1
+            continue
 
         # wait for stabilization of the speaker
         time.sleep(3)
@@ -247,7 +258,21 @@ if __name__ == "__main__":
     time.sleep(3)
 
     # back to zero position: speaker & table
-    rv = subprocess.run([_AURALIS_DIR+"/cli/auralys_ctrl.py", "-c", "cmd", "gozero", "-rs", "0", "-rt", "0", "-v"],stdout=subprocess.PIPE).stdout.decode("utf-8")
+    proc = subprocess.run([_AURALIS_DIR+"/cli/auralys_ctrl.py", "-c", "cmd", "gozero", "-rs", "0", "-rt", "0", "-v"],stdout=subprocess.PIPE)
+    rv = proc.stdout.decode("utf-8")
 
-    if failed_elevations:
-        sys.exit("\n[ERROR] incomplete HRTF capture, failed elevations (deg): {}".format(failed_elevations))
+    if proc.returncode != 0:
+        print(rv)
+        print("[ERROR] gozero failed (exit {}): the rig may not be back at zero".format(proc.returncode))
+        gozero_failed = True
+
+    if failed_elevations or gozero_failed:
+        msg = "\n[ERROR] incomplete HRTF capture"
+
+        if failed_elevations:
+            msg += ", failed elevations (deg): {}".format(failed_elevations)
+
+        if gozero_failed:
+            msg += ", gozero failed: check the rig position before the next run"
+
+        sys.exit(msg)
