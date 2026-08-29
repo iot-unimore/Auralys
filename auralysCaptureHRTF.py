@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 #
 _ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
 _CMD_DIR = os.path.join(_ROOT_DIR, "./hrtf")
-_AURALIS_DIR = os.path.join(_ROOT_DIR,"./auralysSpeaker")
+_AURALIS_DIR = os.path.join(_ROOT_DIR,"./firmware/auralysSpeaker")
 _HRTF_DIR = os.path.join(_ROOT_DIR,"./hrtf")
 _AUDIO_DIR = os.path.join(_ROOT_DIR,"./audio")
 
