@@ -332,6 +332,14 @@ void httpServerLoop()
                                 reply["accel"]["x"] = acc_x;
                                 reply["accel"]["y"] = acc_y;
                                 reply["accel"]["z"] = acc_z;
+                                /* memory health: free heap and largest allocatable block. */
+                                /* a free heap that stays flat while the largest block    */
+                                /* shrinks means the heap is fragmenting.                 */
+                                reply["heap"] = ESP.getFreeHeap();
+                                reply["heap_max_block"] = ESP.getMaxAllocHeap();
+                                /* uptime: a value that went backwards between two */
+                                /* polls means the unit reset without telling us.  */
+                                reply["uptime_ms"] = millis();
                                 serializeJsonPretty(reply, client);
                             }
                             else

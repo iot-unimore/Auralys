@@ -78,10 +78,10 @@
 /* Software Revision - BEGIN */
 #define SW_VER_MJR    (0) /* NOTE: 0->255, 1byte coded */
 #define SW_VER_MIN    (4) /* NOTE: 0->15,   4bit coded */
-#define SW_VER_REV    (0) /* NOTE: 0->3,    2bit coded  */
+#define SW_VER_REV    (1) /* NOTE: 0->3,    2bit coded  */
 
 /* switch define for debug/release + qa build type */
-#define DEBUG
+//#define DEBUG
 // #define QA
 
 /* SW VERSIONS for OTA : 0->3, 2 bit coded
