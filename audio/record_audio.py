@@ -137,7 +137,8 @@ async def play_silence(
         try:
             sd.check_output_settings(device=device, samplerate=48000)
         except:
-            logger.error("unsupported audio playback format 48k")
+            # informational only: nothing here plays at 48k, the device is clocked at "samplerate"
+            logger.debug("unsupported audio playback format 48k")
 
         # playback stream
         stream = sd.OutputStream(device=device, channels=2, samplerate=samplerate, callback=silence_callback, **kwargs)
@@ -268,7 +269,8 @@ async def play_audio(
         try:
             sd.check_output_settings(device=device, samplerate=48000)
         except:
-            logger.error("unsupported audio playback format 48k")
+            # informational only: nothing here plays at 48k, the device is clocked at "samplerate"
+            logger.debug("unsupported audio playback format 48k")
 
         # playback stream
         stream = sd.OutputStream(device=device, channels=2, samplerate=samplerate, blocksize=10240, callback=audio_callback, **kwargs)
@@ -317,7 +319,7 @@ async def record_audio(
             audio_file = sf.SoundFile(
                 measure_folder + "/" + measure_name + "/audio_" + str(playback_repeat) + ".wav",
                 mode="w",
-                samplerate=96000,
+                samplerate=samplerate,
                 channels=22,
                 subtype="PCM_24",
             )

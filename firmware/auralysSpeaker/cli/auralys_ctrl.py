@@ -419,7 +419,7 @@ def set_position(x, y, z, type):
             logger.error("coordinates verification failed.")
             return -1
 
-        if 0 != verify_coord_cartesian_limits(x, y, x):
+        if 0 != verify_coord_cartesian_limits(x, y, z):
             logger.error("coordinates verification failed.")
             return -1
 
