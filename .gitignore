@@ -4,3 +4,4 @@ firmware/auralysSpeaker/cli/__pycache__/
 hrtf/__pycache__/
 firmware/auralysSpeaker/libraries
 firmware/build
+docs/sessions
