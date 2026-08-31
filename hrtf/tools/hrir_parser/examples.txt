@@ -1,0 +1,18 @@
+
+# single elevation plot, dual mic
+./plot_hrir_delays.py elevation_0*_rx_[4,5].csv
+./plot_hrir_delays.py elevation_0*_rx_[6,9].csv
+./plot_hrir_delays.py elevation_0*_rx_[7,10].csv
+./plot_hrir_delays.py 'elevation_0*_rx_(7|10).csv'
+
+# only positive elevation
+./plot_hrir_delays.py 'elevation_\d+_rx_(7|10).csv'
+./plot_hrir_delays.py 'elevation_\d+_rx_(6|9).csv'
+./plot_hrir_delays.py 'elevation_\d+_rx_(4|5).csv'
+
+# with ALL elvations, positive and negative
+./plot_hrir_delays.py 'elevation_-?\d+_rx_(4|5).csv'
+./plot_hrir_delays.py 'elevation_-?\d+_rx_(6|9).csv'
+./plot_hrir_delays.py 'elevation_-?\d+_rx_(7|10).csv'
+./plot_hrir_delays.py 'elevation_-?\d+_rx_(8|11).csv'
+
