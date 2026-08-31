@@ -138,7 +138,45 @@ def compute_delay_adj(data=None, idx=0):
     return i
 
 
-def read_ir_delays(data=None, configs=None, folders=None):
+def compute_delay_offset(data=None, idx=0, sr=96000, offset=0.0001):
+    """Back the crop index off by a small guard.
+
+    Cropping the IR exactly at the detected arrival would cut into the leading
+    edge of the wavefront: compute_hrir.find_ir_onset triggers at a fraction of
+    the envelope peak, so part of the rising edge still sits before that index.
+    The guard keeps it.
+
+    NOTE: idx is the ONSET, not the peak. This replaces compute_delay_adj(),
+          which walked backwards from the argmax peak looking for the leading
+          edge. compute_hrir now reports the onset directly, so the search is
+          redundant and would only back off a second time.
+
+          Kept identical to compute_3dti_sofa.compute_delay_offset so that both
+          writers crop at the same index.
+    """
+    adata = abs(data)
+
+    peak_idx = idx
+
+    if peak_idx == 0:
+        peak_idx = np.argmax(adata)
+
+    # must be multiple of 2: int() has to be applied AFTER the halving,
+    # int(offset * sr) / 2 * 2 gives back an odd number (9.0 at 96 kHz)
+    offset_samples = int(offset * sr / 2) * 2
+
+    if offset_samples < peak_idx:
+        peak_idx = peak_idx - offset_samples
+
+    return int(peak_idx)
+
+
+def read_ir_delays(data=None, data_onset=None, configs=None, folders=None):
+    """Collect the per-measurement arrival times written by compute_hrir.
+
+    data       : (M,R) filled with ir_delay_samples, the integer crop index
+    data_onset : (M,R) filled with ir_delay, the sub-sample arrival in seconds
+    """
     global _CTRL_EXIT_SIGNAL
 
     err = 0
@@ -169,14 +207,34 @@ def read_ir_delays(data=None, configs=None, folders=None):
                 ir_yaml = None
 
             if ir_yaml != None:
-                data[i, ii] = ir_yaml["ir_delay"]
+                #
+                # AES69-2022: Data.Delay is expressed in samples. this used to
+                # store ir_delay, which is in seconds, so the delays written here
+                # disagreed with the ones compute_3dti_sofa writes. the sub-sample
+                # arrival now goes to data_onset instead, where it belongs.
+                #
+                data[i, ii] = int(ir_yaml["ir_delay_samples"])
+                if data_onset is not None:
+                    data_onset[i, ii] = float(ir_yaml["ir_delay"])
+
                 samples_ir = max(samples_ir, int(ir_yaml["ir_samples"]))
                 samples_ir_window = max(samples_ir_window, int(ir_yaml["ir_norm_hipass_window_samples"]))
+            else:
+                # leaving the slot at zero would put a silently wrong delay in the
+                # SOFA file and still exit clean: report it instead
+                err += 1
 
     return (err, samples_ir, samples_ir_window)
 
 
 def read_ir_sample(params):
+    """Load one measurement into the shared SOFA arrays. Returns an error count.
+
+    NOTE: the caller runs this through a ThreadPool, NOT a process Pool. The
+          writes into sofa_data_ir / sofa_data_delay are in-place on shared
+          memory: with a process Pool every write would land in a forked copy
+          and the SOFA file would come out all zeros.
+    """
     global _CTRL_EXIT_SIGNAL
 
     err = 0
@@ -187,11 +245,12 @@ def read_ir_sample(params):
     folder = params[2]
     zero_delay = params[3]
     sofa_data_ir = params[4]
+    sofa_data_delay = params[5]
 
     for ii in range(config["setup"]["listeners"][0]["receivers_count"]):
         # handle CTRL-C
         if _CTRL_EXIT_SIGNAL:
-            return
+            return err
 
         ir_trid = config["setup"]["listeners"][0]["receivers"][ii]["track_id"]
         ir_folder = folder + "/ir/"
@@ -208,6 +267,9 @@ def read_ir_sample(params):
         except:
             logger.error("ERROR while reading {}".format(ir_pyfar_file))
             ir_pyfar = None
+            # an unreadable measurement leaves this direction all zeros in the
+            # SOFA file: report it instead of writing a silent hole
+            err += 1
 
         if ir_pyfar != None:
             # fetch impulse response in time domain
@@ -217,29 +279,37 @@ def read_ir_sample(params):
                 # retrieve info from file processing, 3DTune-In requires zero-delay aligned files!!
                 ir_info = ir_pyfar["ir_info"]
                 ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
+                ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
 
-                # make sure we preserve the peak for the final IR
-                # ir_delay_samples = np.argmax(np.abs(ir_pyfar["ir_norm_hipass_window"].time[0]))
-                # if ir_delay_samples > 4:
-                #     ir_delay_samples -= 4
-
-                # ir_delay_samples = compute_delay(ir_pyfar["ir_norm_hipass_window"].time[0])
-                ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
+                # back the crop index off by a guard so we do not cut into the
+                # leading edge. compute_delay_adj() used to search backwards from
+                # the argmax peak: compute_hrir reports the onset now, so that
+                # search is redundant. same guard as compute_3dti_sofa.
+                ir_delay_samples = compute_delay_offset(
+                    data=ir_pyfar["ir_norm_hipass_window"].time[0],
+                    idx=ir_delay_samples,
+                    sr=ir_samplerate,
+                    offset=0.0001,
+                )
 
                 ir_len = ir_pyfar["ir_norm_hipass_window"].n_samples
 
                 if ir_len > ir_delay_samples:
                     tmp = ir_len - ir_delay_samples
                     sofa_data_ir[i, ii, 0:tmp] = ir_pyfar["ir_norm_hipass_window"].time[0][ir_delay_samples:]
+                    sofa_data_delay[i, ii] = ir_delay_samples
                 else:
                     logger.error(
                         "ERROR: invalide delay samples for:{} rx_id:{} [{}<{}] ".format(
                             ir_pyfar_filename, ii, ir_len, ir_delay_samples
                         )
                     )
+                    err += 1
+
+    return err
 
 
-def read_ir_samples(data=None, configs=None, folders=None, zero_delay=False):
+def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero_delay=False):
     global _CTRL_EXIT_SIGNAL
 
     err = 0
@@ -248,7 +318,7 @@ def read_ir_samples(data=None, configs=None, folders=None, zero_delay=False):
         for ii in range(configs[i]["setup"]["listeners"][0]["receivers_count"]):
             # handle CTRL-C
             if _CTRL_EXIT_SIGNAL:
-                return
+                return err
 
             ir_trid = configs[i]["setup"]["listeners"][0]["receivers"][ii]["track_id"]
             ir_folder = folders[i] + "/ir/"
@@ -267,6 +337,9 @@ def read_ir_samples(data=None, configs=None, folders=None, zero_delay=False):
             except:
                 logger.error("ERROR while reading {}".format(ir_pyfar_file))
                 ir_pyfar = None
+                # an unreadable measurement leaves this direction all zeros in the
+                # SOFA file: report it instead of writing a silent hole
+                err += 1
 
             if ir_pyfar != None:
                 # fetch impulse response in time domain
@@ -277,26 +350,35 @@ def read_ir_samples(data=None, configs=None, folders=None, zero_delay=False):
                     # retrieve info from file processing, 3DTune-In requires zero-delay aligned files!!
                     ir_info = ir_pyfar["ir_info"]
                     ir_delay_samples = int(ir_info[_IR_INFO_DELAY_SAMPLES])
+                    ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
 
-                    # make sure we preserve the peak for the final IR
-                    # ir_delay_samples = np.argmax(np.abs(ir_pyfar["ir_norm_hipass_window"].time[0]))
-                    # if ir_delay_samples > 4:
-                    #     ir_delay_samples -= 4
-
-                    # ir_delay_samples = compute_delay(ir_pyfar["ir_norm_hipass_window"].time[0])
-                    ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
+                    # back the crop index off by a guard so we do not cut into the
+                    # leading edge. compute_delay_adj() used to search backwards
+                    # from the argmax peak: compute_hrir reports the onset now, so
+                    # that search is redundant. same guard as compute_3dti_sofa.
+                    ir_delay_samples = compute_delay_offset(
+                        data=ir_pyfar["ir_norm_hipass_window"].time[0],
+                        idx=ir_delay_samples,
+                        sr=ir_samplerate,
+                        offset=0.0001,
+                    )
 
                     ir_len = ir_pyfar["ir_norm_hipass_window"].n_samples
 
                     if ir_len > ir_delay_samples:
                         tmp = ir_len - ir_delay_samples
                         data[i, ii, 0:tmp] = ir_pyfar["ir_norm_hipass_window"].time[0][ir_delay_samples:]
+                        if data_delay is not None:
+                            data_delay[i, ii] = ir_delay_samples
                     else:
                         logger.error(
                             "ERROR: invalide delay samples for:{} rx_id:{} [{}<{}] ".format(
                                 ir_pyfar_filename, ii, ir_len, ir_delay_samples
                             )
                         )
+                        err += 1
+
+    return err
 
 
 def read_sources_listeners(data=None):
@@ -312,24 +394,24 @@ def read_sources_listeners(data=None):
     for config in data:
         # check config syntax
         if (err == 0) and (config["syntax"]["name"] != "audio_measure"):
-            log.error("compute_sofa: invalid config syntax")
+            logger.error("compute_sofa: invalid config syntax")
             err += 1
 
         # AES69: mandate only one source
         if (err == 0) and (config["setup"]["sources_count"] != 1):
-            log.error("compute_sofa: invalid sources count for {}".format(config["custom"]["audio_folder"]))
+            logger.error("compute_sofa: invalid sources count for {}".format(config["custom"]["audio_folder"]))
             err += 1
 
         # AES69: mandate only one listener
         if (err == 0) and (config["setup"]["listeners_count"] != 1):
-            log.error("compute_sofa: invalid listeners count for {}".format(config["custom"]["audio_folder"]))
+            logger.error("compute_sofa: invalid listeners count for {}".format(config["custom"]["audio_folder"]))
             err += 1
 
         # AES69: receivers count does not change between measures
         if (err == 0) and (
             config["setup"]["listeners"][0]["receivers_count"] != data[0]["setup"]["listeners"][0]["receivers_count"]
         ):
-            log.error("compute_sofa: invalid listeners count for {}".format(config["custom"]["audio_folder"]))
+            logger.error("compute_sofa: invalid listeners count for {}".format(config["custom"]["audio_folder"]))
             err += 1
 
         if err == 0:
@@ -487,7 +569,7 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
     try:
         sofa.verify()
     except:
-        log.error("compute sofa: failure to verify GLOBAL section.")
+        logger.error("compute sofa: failure to verify GLOBAL section.")
 
     #
     # READ SOURCE & LISTENERS:
@@ -660,16 +742,33 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
         # audio delay for each source position
         sofa.Data_Delay = np.zeros((measures_M, receivers_R))
 
+        AuralysPrjIROnsetDelay = np.zeros((measures_M, receivers_R))
+
         (err, samples_ir, samples_ir_window) = read_ir_delays(
-            sofa.Data_Delay, measure_audio_config_list, measure_folder_list
+            sofa.Data_Delay, AuralysPrjIROnsetDelay, measure_audio_config_list, measure_folder_list
         )
 
+        if err:
+            logger.error("compute sofa: {} IR delay entries could not be read, aborting.".format(err))
+
         #
-        # we always keep the IR delay (i.e. IR peak position)
-        # as a private param
-        AuralysPrjIRPeakDelays = copy.deepcopy(sofa.Data_Delay)
-        sofa.add_variable("IRPeakDelay", AuralysPrjIRPeakDelays, dtype="double", dimensions="MR")
-        sofa.add_attribute("GLOBAL_IRPeakDelays", "IR peak delay (samples)")
+        # we always keep the measured time of arrival as a private param.
+        #
+        # this is NOT a duplicate of Data.Delay: AES69 expresses Data.Delay in
+        # whole samples and it holds the index the IR was actually cropped at
+        # (arrival minus the compute_delay_offset guard), while this one is the
+        # sub-sample arrival in seconds as measured by compute_hrir.find_ir_onset.
+        #
+        # it used to be called IRPeakDelay, which described np.argmax of the IR.
+        # compute_hrir now reports the onset, so the name would be misleading.
+        if 0 == err:
+            sofa.add_variable("AuralysPrjIROnsetDelay", AuralysPrjIROnsetDelay, dtype="double", dimensions="MR")
+            sofa.add_attribute("AuralysPrjIROnsetDelay_Units", "seconds")
+            sofa.add_attribute(
+                "AuralysPrjIROnsetDelay_Description",
+                "time of arrival of the direct sound, sub-sample precision, "
+                "referenced to the start of the raw impulse response",
+            )
 
         #
         # if we are not loading IR as "zero-delay" reference we have to
@@ -702,14 +801,17 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
                         measure_folder_list[i],
                         zero_delay,
                         sofa.Data_IR,
+                        sofa.Data_Delay,
                     )
                 )
 
             cpu_pool = multiprocessing.pool.ThreadPool(processes=max_pool_size)
-            cpu_pool.map(read_ir_sample, cpu_pool_params)
+            pool_errors = cpu_pool.map(read_ir_sample, cpu_pool_params)
 
             cpu_pool.close()
             cpu_pool.join()
+
+            err += sum(e for e in pool_errors if e)
 
         else:
             #
@@ -719,14 +821,19 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
             # audio samples for each position
             sofa.Data_IR = np.zeros((measures_M, receivers_R, samples_ir_window))
 
-            if yaml_params["zero_delay"] == False:
-                read_ir_samples(
-                    data=sofa.Data_IR, configs=measure_audio_config_list, folders=measure_folder_list, zero_delay=False
-                )
-            else:
-                read_ir_samples(
-                    data=sofa.Data_IR, configs=measure_audio_config_list, folders=measure_folder_list, zero_delay=True
-                )
+            err += read_ir_samples(
+                data=sofa.Data_IR,
+                data_delay=sofa.Data_Delay,
+                configs=measure_audio_config_list,
+                folders=measure_folder_list,
+                zero_delay=bool(yaml_params["zero_delay"]),
+            )
+
+        if err:
+            # a missing or unreadable measurement leaves an all-zero HRIR at that
+            # direction. the file would still pass sofa.verify(), so refuse to
+            # write it rather than hand out a SOFA with silent holes.
+            logger.error("compute sofa: {} measurement(s) failed to load, output file skipped.".format(err))
 
     #
     # WRITE OUTPUT FILE
@@ -1001,6 +1108,8 @@ if __name__ == "__main__":
 
     logger.info("searching config.yaml: {}".format(yaml_params["measure_folder"]))
 
+    measure_folder_skipped = []
+
     for f in os.walk(yaml_params["measure_folder"]):
         if os.path.exists(os.path.join(str(f[0]), "config.yaml")):
             audio_config = ""
@@ -1047,11 +1156,16 @@ if __name__ == "__main__":
                     )
                     if os.path.exists(os.path.join(str(f[0]), "ir", ir_filename)):
                         try:
-                            if os.stat(os.path.join(str(f[0]), "ir", ir_filename)) == 0:
+                            # os.stat() returns a stat_result, it is never == 0:
+                            # the empty-file check never fired, use st_size
+                            if os.stat(os.path.join(str(f[0]), "ir", ir_filename)).st_size == 0:
+                                logger.error("empty IR file: {}".format(os.path.join(str(f[0]), "ir", ir_filename)))
                                 error_cnt = error_cnt + 1
                         except:
+                            logger.error("cannot stat IR file: {}".format(os.path.join(str(f[0]), "ir", ir_filename)))
                             error_cnt = error_cnt + 1
                     else:
+                        logger.error("missing IR file: {}".format(os.path.join(str(f[0]), "ir", ir_filename)))
                         error_cnt = error_cnt + 1
 
                     # check for "wav" file
@@ -1064,21 +1178,41 @@ if __name__ == "__main__":
                     )
                     if os.path.exists(os.path.join(str(f[0]), "ir", ir_filename)):
                         try:
-                            if os.stat(os.path.join(str(f[0]), "ir", ir_filename)) == 0:
+                            # os.stat() returns a stat_result, it is never == 0:
+                            # the empty-file check never fired, use st_size
+                            if os.stat(os.path.join(str(f[0]), "ir", ir_filename)).st_size == 0:
+                                logger.error("empty IR file: {}".format(os.path.join(str(f[0]), "ir", ir_filename)))
                                 error_cnt = error_cnt + 1
                         except:
+                            logger.error("cannot stat IR file: {}".format(os.path.join(str(f[0]), "ir", ir_filename)))
                             error_cnt = error_cnt + 1
                     else:
+                        logger.error("missing IR file: {}".format(os.path.join(str(f[0]), "ir", ir_filename)))
                         error_cnt = error_cnt + 1
 
             # if everything is there ... add folder to the compute list
             if error_cnt == 0:
                 measure_folder_list.append(f[0])
                 measure_audio_config_list.append(audio_config)
+            else:
+                # dropping the folder silently would produce a SOFA file with
+                # fewer source positions than were actually measured, and still
+                # exit clean. keep count and refuse to write below.
+                logger.error("incomplete measure, folder skipped: {}".format(f[0]))
+                measure_folder_skipped.append(f[0])
 
     #
     # create SOFA object and fetch impulses
     #
-    if len(measure_folder_list) > 0:
-        measures_list = zip(measure_folder_list, measure_audio_config_list)
-        compute_sofa(audio_recording, measures_list, yaml_params)
+    if measure_folder_skipped:
+        sys.exit(
+            "\n[ERROR] {} incomplete measure folder(s), the SOFA file would be missing "
+            "those source positions: {}".format(len(measure_folder_skipped), measure_folder_skipped)
+        )
+
+    if len(measure_folder_list) == 0:
+        sys.exit("\n[ERROR] no complete measure folder found in: {}".format(yaml_params["measure_folder"]))
+
+    measures_list = zip(measure_folder_list, measure_audio_config_list)
+    if compute_sofa(audio_recording, measures_list, yaml_params):
+        sys.exit("\n[ERROR] SOFA computation failed, no output file written.")

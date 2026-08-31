@@ -57,6 +57,26 @@ receivers_pairs = ["binaural", "array_six,front", "array_six,middle", "array_six
 
 _SOUND_SPEED = 343  # m/s
 
+# IR ONSET DETECTION (time of arrival of the direct sound)
+#
+# fraction of the envelope peak that marks the onset. low enough to trigger on the
+# leading edge of the wavefront, high enough to stay clear of the deconvolution
+# noise floor (measured at ~5% of the peak even on the most shadowed receiver).
+_IR_ONSET_THRESHOLD = 0.25
+# largest distance of any receiver from the listener origin, in metres. used to
+# bound the earliest physically possible arrival so that a noise blip in the first
+# samples cannot be mistaken for the wavefront. see the "receivers" section of
+# config.yaml: the farthest one sits at 0.16 m, the margin is deliberate.
+_IR_ONSET_MAX_RX_OFFSET_m = 0.25
+# a wavefront keeps the envelope above threshold for a while, a noise spike does
+# not. crossings closer than _IR_ONSET_MERGE_s belong to the same arrival (the
+# envelope ripples across the threshold), and an arrival must last at least
+# _IR_ONSET_MIN_SUSTAIN_s to be accepted. both are ~5 samples at 96 kHz: measured
+# over 4032 IRs the shortest genuine arrival lasts 0.052 ms while the noise spikes
+# that fooled the detector last a single sample.
+_IR_ONSET_MERGE_s = 0.00005
+_IR_ONSET_MIN_SUSTAIN_s = 0.00005
+
 #
 # extra delay to be added to the reference audio track to compensate for audio dsp chain delay
 _DSP_AUDIO_DELAY = 0
@@ -76,6 +96,104 @@ def int_or_str(text):
 #
 # COMPUTE FUNCTIONS
 #
+def find_ir_onset(ir_time, fs, distance, threshold=_IR_ONSET_THRESHOLD, label=""):
+    """Time of arrival of the direct sound in an impulse response.
+
+    Returns (onset_samples, onset_samples_int) where the first value carries
+    sub-sample precision and the second is the integer index used downstream to
+    crop the IR.
+
+    NOTE: this used to be a plain np.argmax(np.abs(ir)), which returns the LARGEST
+          sample, not the time of arrival. The two coincide only for a clean and
+          roughly symmetric impulse. On a shadowed receiver the direct wavefront is
+          diffracted around the head, smeared over several lobes of comparable
+          height: the global maximum then hops from one lobe to the next as the
+          source rotates. With the source below the head an early floor reflection
+          can outrank the direct sound altogether. Both show up as 0.3 to 0.5 ms
+          steps in the delay-vs-azimuth curve, which is one lobe period.
+
+          Searching forward for the ONSET is immune to both: a later arrival, however
+          strong, cannot win against an earlier one that already crossed threshold.
+
+    ir_time  : 1D impulse response
+    distance : source distance in metres, sets the search region
+    """
+    # SAFETY SEARCH WINDOW: the first direct reflection travels at the speed of
+    # sound, so we keep twice the distance in case of a non ideal recording
+    # environment. the onset detector takes the FIRST crossing, so a wide window
+    # costs nothing here (unlike argmax, which a late reflection could capture).
+    search_stop = int(2 * (distance / _SOUND_SPEED) * fs)
+    search_stop = min(search_stop, len(ir_time))
+
+    # nothing can arrive before the source reaches the closest possible receiver
+    search_start = int(((distance - _IR_ONSET_MAX_RX_OFFSET_m) / _SOUND_SPEED) * fs)
+    search_start = max(0, min(search_start, search_stop - 1))
+
+    region = ir_time[search_start:search_stop]
+
+    # envelope: magnitude of the analytic signal. taking |ir| directly would ripple
+    # at the carrier rate and cross the threshold on an arbitrary half-cycle.
+    envelope = np.abs(sig.hilbert(region))
+
+    level = threshold * envelope.max()
+
+    # runs of consecutive samples above threshold
+    above = (envelope >= level).astype(np.int8)
+    edges = np.diff(np.concatenate([[0], above, [0]]))
+    run_begin = np.flatnonzero(edges == 1)
+    run_end = np.flatnonzero(edges == -1)
+
+    if len(run_begin) == 0:
+        # cannot happen for a finite envelope, guard anyway rather than index [0]
+        return float(search_start), search_start
+
+    # merge runs that are close enough to be the same arrival rippling across the
+    # threshold, then take the first one that lasts long enough to be a wavefront
+    merge = max(1, int(_IR_ONSET_MERGE_s * fs))
+    begins = [run_begin[0]]
+    ends = [run_end[0]]
+    for i in range(1, len(run_begin)):
+        if run_begin[i] - ends[-1] < merge:
+            ends[-1] = run_end[i]
+        else:
+            begins.append(run_begin[i])
+            ends.append(run_end[i])
+
+    sustain = max(1, int(_IR_ONSET_MIN_SUSTAIN_s * fs))
+    idx = next(
+        (b for b, e in zip(begins, ends) if (e - b) >= sustain),
+        begins[0],  # nothing sustained: fall back to the first crossing
+    )
+    idx = int(idx)
+
+    # sub-sample position: linear interpolation of the envelope across the crossing
+    onset = float(idx)
+    if idx > 0:
+        rise = envelope[idx] - envelope[idx - 1]
+        if rise > 0:
+            onset = (idx - 1) + (level - envelope[idx - 1]) / rise
+
+    onset += search_start
+
+    # the envelope was already above threshold on the first sample of the region:
+    # there is no rising edge to lock onto, so the wavefront is either missing or
+    # buried in noise and the returned value is meaningless. worth a warning, the
+    # measurement should be discarded rather than trusted.
+    if idx == 0:
+        logger.warning(
+            "find_ir_onset: {}no arrival found in the search window "
+            "[{:.3f},{:.3f}] ms, delay pinned at the window start".format(
+                label + ": " if label else "",
+                search_start / fs * 1000,
+                search_stop / fs * 1000,
+            )
+        )
+
+    # downstream (compute_sofa, compute_3dti_sofa) slices the IR with this index,
+    # so floor it: never crop into the leading edge of the wavefront.
+    return onset, int(np.floor(onset))
+
+
 def dbfft(x, fs, win=None, db_ref=None):
     N = len(x)  # Length of input sequence
 
@@ -510,18 +628,21 @@ def compute_hrir(folder=None):
         # using pyfar is actually slower...
         # ir_delay= pf.dsp.find_impulse_response_delay(ir)
 
-        # so going with max correlation in time,
-        # since we know the distance we keep a "SAFETY SEARCH WINDOW" in case
-        # we have a non ideal recording environment: the first DIRECT reflection
-        # is travelling at the sound speed, we keep twice the distance
+        # so going with our own onset detector: see find_ir_onset() for why the
+        # previous np.argmax(np.abs(ir)) produced 0.3 to 0.5 ms discontinuities in
+        # the delay-vs-azimuth curve of the shadowed receiver of each pair.
+        #
+        # ir_delay carries sub-sample precision and is what the QC plots read from
+        # the log. ir_delay_samples stays an integer index because compute_sofa and
+        # compute_3dti_sofa use it to slice the IR.
+        ir_delay_subsample, ir_delay_samples = find_ir_onset(
+            ir.time[0],
+            fs,
+            source_position[2],
+            label="source {}, rx {}".format(source_position_str, str(rx_id)),
+        )
 
-        distance_sound_delay = 2 * (source_position[2] / _SOUND_SPEED)
-
-        # ir_delay_samples = np.argmax( np.abs( ir.time ) )
-        ir_delay_samples = np.argmax(np.abs(ir.time[:, : int(distance_sound_delay * fs)]))
-
-        # ir_delay = np.argmax(np.abs(ir.time)) / fs
-        ir_delay = ir_delay_samples / fs
+        ir_delay = ir_delay_subsample / fs
 
         logger.info(
             "compute hrir: source {}, rx {}, STEP-02b: IR delay={} [ms]".format(
