@@ -11,6 +11,7 @@ import glob
 import yaml
 import logging
 import argparse
+import zipfile
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -81,6 +82,29 @@ _IR_ONSET_MIN_SUSTAIN_s = 0.00005
 # extra delay to be added to the reference audio track to compensate for audio dsp chain delay
 _DSP_AUDIO_DELAY = 0
 
+#
+# .far OUTPUT FILES
+#
+# pyfar 0.6.8 io.write() has its compression flag inverted with respect to its own
+# docstring:
+#
+#     compression = zipfile.ZIP_STORED if compress else zipfile.ZIP_DEFLATED
+#
+# so compress=False is the value that actually deflates, which is what we want: a
+# measurement set is ~800 source positions x 12 receivers, 23.7 MB deflated against
+# 45 MB stored, and one set already fills 225 GB.
+#
+# NOTE: the previous code passed "compressed=True", which is not a parameter of
+#       io.write() at all. It fell through into **objs and was written inside every
+#       .far as a stray builtin named "compressed". The files were deflated by
+#       accident, through the default. Files written before this fix carry that
+#       extra key; nothing reads it.
+_IR_FAR_COMPRESS = False
+
+# how many times to write a .far before giving up. every attempt is verified, see
+# write_far_verified().
+_IR_FAR_WRITE_ATTEMPTS = 3
+
 
 #
 # TOOLS
@@ -91,6 +115,103 @@ def int_or_str(text):
         return int(text)
     except ValueError:
         return text
+
+
+def verify_far(path, expected=None):
+    """CRC-check a .far file. Returns an error string, or None if the file is good.
+
+    A .far is a zip and every member carries a CRC32 taken over the data before
+    compression, so reading the file back covers the whole path from the arrays in
+    memory to the bytes on the platter.
+
+    NOTE: `expected` only works for objects pyfar stores as members of their own,
+          which is every pyfar type and every numpy array. Plain builtins (bool,
+          int, str ...) are collected into a single "builtin_wrapper" member
+          instead and would be reported as missing.
+    """
+    stored = []
+
+    try:
+        with zipfile.ZipFile(path) as zip_file:
+            bad = zip_file.testzip()
+            if bad != None:
+                return "bad CRC on member '{}'".format(bad)
+
+            names = zip_file.namelist()
+            stored = [
+                info.filename
+                for info in zip_file.infolist()
+                if (info.compress_type == zipfile.ZIP_STORED) and (info.file_size > 0)
+            ]
+    except Exception as exc:
+        return "cannot read back as zip: {}".format(exc)
+
+    if expected != None:
+        # a member is stored as "<object name>/<part>", we only care about the
+        # object names: an empty or truncated write would lose them entirely
+        found = set(name.split("/")[0] for name in names)
+        missing = sorted(set(expected) - found)
+        if len(missing) > 0:
+            return "missing object(s): {}".format(", ".join(missing))
+
+    if len(stored) > 0:
+        # see _IR_FAR_COMPRESS: a pyfar release that repairs the inverted flag
+        # would silently double the size of every .far written here
+        return "written uncompressed, check the _IR_FAR_COMPRESS flag against this pyfar version"
+
+    return None
+
+
+def write_far_verified(path, label="", attempts=_IR_FAR_WRITE_ATTEMPTS, **objs):
+    """Write a .far file and read it back before moving on. Returns an error count.
+
+    This is not paranoia. On the 20260903 set exactly one file out of 9504 came out
+    with a single flipped bit in its deflate stream (file offset 7988814, 0x05 ->
+    0x07). The CRC in the zip header matched the correct data, and the twin .wav
+    written moments later held the correct sample, so both the array in RAM and the
+    compressed payload were right: the bit flipped somewhere between zlib and the
+    disk. Nothing in the log said so. It surfaced half an hour later as a
+    BadZipFile in compute_3dti_sofa, and only for the one receiver selection that
+    happened to open that file.
+
+    Verifying costs one re-read per file and turns a silent flip into a rewrite.
+
+    NOTE: the .wav files written next to the .far carry no checksum of their own
+          and cannot be covered this way.
+    """
+    reason = "not attempted"
+
+    for attempt in range(1, attempts + 1):
+        try:
+            pf.io.write(path, compress=_IR_FAR_COMPRESS, **objs)
+        except Exception as exc:
+            reason = "write failed: {}".format(exc)
+        else:
+            reason = verify_far(path, expected=objs.keys())
+            if reason == None:
+                if attempt > 1:
+                    logger.error(
+                        "compute hrir: {}{} written correctly on attempt {} of {}".format(
+                            label, path, attempt, attempts
+                        )
+                    )
+                return 0
+
+        logger.error(
+            "compute hrir: {}{} failed verification on attempt {} of {}: {}".format(
+                label, path, attempt, attempts, reason
+            )
+        )
+
+    # the file is left on disk on purpose: deleting it would only turn a loud
+    # failure here into a "missing IR file" one folder scan later
+    logger.error(
+        "compute hrir: {}GIVING UP on {} after {} attempts, the .far file on disk is NOT usable".format(
+            label, path, attempts
+        )
+    )
+
+    return 1
 
 
 #
@@ -804,9 +925,9 @@ def compute_hrir(folder=None):
 
             ir_info = np.array([ir_delay, ir_delay_samples, dbFS_calib, samplerate])
 
-            pf.io.write(
+            write_far_verified(
                 ir_path + ir_filename,
-                compressed=True,
+                label="source {}, rx {}, ".format(source_position_str, str(rx_id)),
                 ir=ir,
                 ir_norm_hipass_window=ir_norm_hipass_window,
                 ir_info=ir_info,
