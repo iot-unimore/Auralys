@@ -25,7 +25,7 @@ _AUDIO_DIR = os.path.join(_ROOT_DIR,"./audio")
 # Use alternating pattern for AZIMUTH position
 _AZIMUTH_BEGIN = 360
 _AZIMUTH_END = 1
-_AZIMUTH_STEP = -10
+_AZIMUTH_STEP = -5
 _USE_ALTERNATE_AZIMUTH = False
 
 # AUDIO CARD USB IDs
@@ -42,31 +42,31 @@ _FFPROBE_EXE = "/usr/bin/ffprobe"
 _APLAY_EXE = "/usr/bin/aplay"
 
 # Define a Speaker 3D Position Table with 3 columns [azimuth, X, Z] (Y=0) and 10 rows (i.e. 10 positions)
-auralysPositions = [
-    [45, 707, 2490],
-    [30, 866, 2200],
-    [15, 910, 2000],
-    [0, 1000, 1650],
-    [-15, 960, 1391],
-    [-30, 870, 1100],
-    [-45, 800, 900],
-]
-
 # auralysPositions = [
-#     [ 60,  500, 2516],
-#     [ 50,  643, 2416],
-#     [ 40,  766, 2293],
-#     [ 30,  866, 2150],
-#     [ 20,  940, 1992],
-#     [ 10,  985, 1824],
-#     [  0, 1000, 1650],
-#     [-10,  985, 1476],
-#     [-20,  940, 1308],
-#     [-30,  866, 1150],
-#     [-40,  766, 1007],
-#     [-50,  643,  884],
-#     [-60,  500,  784]
+#     [45, 707, 2490],
+#     [30, 866, 2200],
+#     [15, 910, 2000],
+#     [0, 1000, 1650],
+#     [-15, 960, 1391],
+#     [-30, 870, 1100],
+#     [-45, 800, 900],
 # ]
+
+auralysPositions = [
+#    [ 60,  500, 2516],
+    [ 50,  643, 2416],
+    [ 40,  766, 2293],
+    [ 30,  866, 2150],
+    [ 20,  940, 1992],
+    [ 10,  985, 1824],
+    [  0, 1000, 1650],
+    [-10,  985, 1476],
+    [-20,  940, 1308],
+    [-30,  866, 1150],
+    [-40,  766, 1007],
+    [-50,  643,  884],
+#    [-60,  500,  784]
+]
 
 
 ########################################################################################################################
@@ -253,9 +253,9 @@ if __name__ == "__main__":
                 str(_AZIMUTH_STEP),
                 "-m",
                 # "/media/gfilippi/audiodata/wilsonClean_20250809-001",
-                "/media/gfilippi/audiodata/wilsonPippo",
+                "/media/gfilippi/audiodata/auralysNoHead_20260905-001",
                 "-n",
-                "wilsonClean",
+                "auralysNoHead",
                 # "-t", #dry-run, no audio recording
             ],
             stdout=subprocess.PIPE,
