@@ -135,6 +135,21 @@ def compute_delay_adj(data=None, idx=0):
 
     return i
 
+_IR_CROP_GUARD_s = 0.0001
+
+
+def crop_guard_samples(samplerate=96000, offset=_IR_CROP_GUARD_s):
+    """Samples kept ahead of a detected onset when an IR is cropped.
+
+    compute_hrir.find_ir_onset triggers at a fraction of the envelope peak, so a
+    little of the rising edge still sits before the index it reports.
+
+    must be a multiple of 2: int() has to be applied AFTER the halving,
+    int(offset * sr) / 2 * 2 gives back an odd number (9.0 at 96 kHz).
+    """
+    return int(offset * samplerate / 2) * 2
+
+
 def compute_delay_offset(data=None, idx=0, sr=96000, offset=0.0001):
     """Back the crop index off by a small guard.
 
@@ -155,14 +170,169 @@ def compute_delay_offset(data=None, idx=0, sr=96000, offset=0.0001):
     if peak_idx == 0:
         peak_idx = np.argmax(adata)
 
-    # must be multiple of 2: int() has to be applied AFTER the halving,
-    # int(offset * sr) / 2 * 2 gives back an odd number (9.0 at 96 kHz)
-    offset_samples = int(offset * sr / 2) * 2
+    offset_samples = crop_guard_samples(sr, offset)
 
     if offset_samples < peak_idx:
         peak_idx = peak_idx - offset_samples
 
     return int(peak_idx)
+
+def excluded_receivers(config=None, exclude_names=None):
+    """Receiver ids whose short_name was named on --exclude.
+
+    Only affects which onsets are allowed to set the zero_delay time origin. A
+    receiver that was never really recorded (an array left in the config from an
+    older session) reports a meaningless early onset, and letting it win the
+    minimum would delay every rendered track by the difference for nothing.
+    """
+    rv = []
+
+    if not exclude_names:
+        return rv
+
+    known = []
+    for idx in range(config["setup"]["listeners"][0]["receivers_count"]):
+        short_name = config["setup"]["listeners"][0]["receivers"][idx].get("short_name")
+        if short_name not in known:
+            known.append(short_name)
+        if short_name in exclude_names:
+            rv.append(idx)
+
+    for name in exclude_names:
+        if name not in known:
+            logger.warning(
+                "compute sofa: --exclude '{}' matches no receiver, ignored (this listener has: {})".format(
+                    name, ", ".join(str(k) for k in known)
+                )
+            )
+
+    return rv
+
+
+def scan_onset_minimum(configs=None, folders=None, exclude_list=None):
+    """Earliest IR onset over every receiver of the session that is not excluded.
+
+    This is the time origin the session is referenced to. It has to span the
+    receivers that end up rendered TOGETHER, not just the ones this run writes:
+    3DTune-In re-zeroes each file it loads against that file own smallest
+    Data.Delay, so files that share a render have to agree on it. See the
+    onset_reference block in compute_sofa().
+
+    Reads the two lines it needs out of each sidecar instead of parsing them:
+    yaml.safe_load over every receiver of every measure is a slow way to find two
+    numbers, and this runs before any of the real work. ir_delay_samples is the
+    integer crop index the minimum has to be expressed in; ir_delay is the same
+    arrival with sub-sample precision, and the mean of it is what the render
+    latency is built on, where flooring would cost half a sample.
+
+    Returns (minimum in samples, mean arrival in seconds, onsets read, errors).
+    """
+    global _CTRL_EXIT_SIGNAL
+
+    err = 0
+    count = 0
+    rv = None
+    total = 0.0
+
+    for i in range(len(configs)):
+        # handle CTRL-C
+        if _CTRL_EXIT_SIGNAL:
+            return (rv, (total / count) if count else None, count, err)
+
+        for ii in range(configs[i]["setup"]["listeners"][0]["receivers_count"]):
+            if (exclude_list != None) and (ii in exclude_list):
+                continue
+
+            ir_trid = configs[i]["setup"]["listeners"][0]["receivers"][ii]["track_id"]
+            ir_yaml_file = (
+                folders[i]
+                + "/ir/"
+                + configs[i]["custom"]["audio_filename"]
+                + "_IR_rx_"
+                + str(ii)
+                + "_trid_"
+                + str(ir_trid)
+                + ".yaml"
+            )
+
+            value = None
+            arrival = None
+            try:
+                with open(ir_yaml_file, "r") as file:
+                    for line in file:
+                        if line.startswith("ir_delay_samples:"):
+                            value = int(line.split(":", 1)[1].strip().strip("'\""))
+                        elif line.startswith("ir_delay:"):
+                            arrival = float(line.split(":", 1)[1].strip().strip("'\""))
+                        if (value != None) and (arrival != None):
+                            break
+            except:
+                value = None
+                arrival = None
+
+            if (value == None) or (arrival == None):
+                # a missing onset here would silently raise the reference and skew
+                # this file against the others: report it instead
+                logger.error("compute sofa: cannot read onset from {}".format(ir_yaml_file))
+                err += 1
+            else:
+                count += 1
+                total += arrival
+                if (rv == None) or (value < rv):
+                    rv = value
+
+    return (rv, (total / count) if count else None, count, err)
+
+
+def sibling_reference_check(filepath=None, project=None, filename=None, reference=None):
+    """Refuse to add a file to a session built on a different time origin.
+
+    Each run works the reference out on its own, so a --exclude passed to some of
+    them and not the others would go unnoticed and skew the merged tracks. Every
+    file records what it used, so compare against the ones already on disk.
+    """
+    err = 0
+
+    try:
+        import netCDF4
+    except:
+        logger.warning(
+            "compute sofa: netCDF4 not available, cannot cross check the zero_delay "
+            "reference against the other files of this session"
+        )
+        return 0
+
+    for f in sorted(glob.glob(os.path.join(filepath, project + "_*.sofa"))):
+        if os.path.basename(f) == filename:
+            continue
+
+        other = None
+        try:
+            nc = netCDF4.Dataset(f, "r")
+            # sofar stores GLOBAL_Foo as the plain netCDF attribute Foo
+            if "AuralysPrjZeroDelayReference" in nc.ncattrs():
+                other = int(nc.getncattr("AuralysPrjZeroDelayReference"))
+            nc.close()
+        except:
+            other = None
+
+        if other == None:
+            logger.warning(
+                "compute sofa: {} records no zero_delay reference, it predates this and will "
+                "NOT stay aligned with the file being written".format(os.path.basename(f))
+            )
+        elif other != reference:
+            logger.error(
+                "compute sofa: {} was built on reference {}, this run is on {}: rendered together "
+                "the two would be skewed by {} samples. rebuild the session with the same "
+                "--exclude, or remove the stale file.".format(
+                    os.path.basename(f), other, reference, abs(other - reference)
+                )
+            )
+            err += 1
+
+    return err
+
 
 def read_ir_delays(data=None, data_onset=None, configs=None, folders=None, receivers_list=None):
     """Collect the per-measurement arrival times written by compute_hrir.
@@ -250,6 +420,7 @@ def read_ir_sample(params):
     sofa_data_ir = params[6]
     sofa_data_delay = params[7]
     remove_direct_path = params[8]
+    crop_offset = params[9]
 
     selection_list = range(config["setup"]["listeners"][0]["receivers_count"])
     if receivers_list != None:
@@ -295,12 +466,16 @@ def read_ir_sample(params):
                 ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
                 ir_samples = len(ir_pyfar["ir_norm_hipass_window"].time[0])
 
-                # make sure we preserve the peak for the final IR
                 # ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
-                ir_delay_samples = compute_delay_offset(data=ir_pyfar["ir_norm_hipass_window"].time[0], idx=ir_delay_samples, sr=ir_samplerate, offset=0.0001)
+                # crop_offset is this file own first arrival measured from the session
+                # time origin, so every file of the session lands on the same origin and
+                # min(Data.Delay) comes out equal in all of them. see the zero_delay block
+                # in compute_sofa(): that equality is what keeps the receiver pairs aligned
+                # when they are rendered separately and merged.
+                ir_delay_samples = ir_delay_samples - crop_offset
                 ir_len = ir_pyfar["ir_norm_hipass_window"].n_samples
 
-                if ir_len > ir_delay_samples:
+                if (ir_delay_samples >= 0) and (ir_len > ir_delay_samples):
                     # window/all samples count
                     tmp = ir_len - ir_delay_samples
                     if tmp > samples_ir_window:
@@ -308,7 +483,14 @@ def read_ir_sample(params):
 
                     if(remove_direct_path>0):
                         # TODO: apply windowing to the crossing point
-                        ir_null_samples = ir_delay_samples + int(round(ir_samplerate*remove_direct_path))
+                        # measured from the onset, as before, not from the crop index
+                        ir_guarded_samples = compute_delay_offset(
+                            data=ir_pyfar["ir_norm_hipass_window"].time[0],
+                            idx=(ir_delay_samples + crop_offset),
+                            sr=ir_samplerate,
+                            offset=0.0001,
+                        )
+                        ir_null_samples = ir_guarded_samples + int(round(ir_samplerate*remove_direct_path))
                         if(ir_samples < ir_null_samples):
                             ir_null_samples = ir_samples
                         # erase direct path wave
@@ -328,8 +510,8 @@ def read_ir_sample(params):
                         sofa_data_delay[i, ii] = ir_delay_samples
                 else:
                     logger.error(
-                        "ERROR: invalide delay samples for:{} rx_id:{} [{}<{}] ".format(
-                            ir_pyfar_filename, ii, ir_len, ir_delay_samples
+                        "ERROR: invalid crop index for:{} rx_id:{} [crop {} outside 0..{}] ".format(
+                            ir_pyfar_filename, ii, ir_delay_samples, ir_len
                         )
                     )
                     err += 1
@@ -339,7 +521,7 @@ def read_ir_sample(params):
     return err
 
 
-def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero_delay=False, receivers_list=None, samples_ir_window=0, remove_direct_path=0.0):
+def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero_delay=False, receivers_list=None, samples_ir_window=0, remove_direct_path=0.0, crop_offset=0):
     global _CTRL_EXIT_SIGNAL
 
     err = 0
@@ -391,14 +573,18 @@ def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero
                     ir_samplerate = int(ir_info[_IR_INFO_SAMPLERATE])
                     ir_samples = len(ir_pyfar["ir_norm_hipass_window"].time[0])
 
-                    # make sure we preserve the peak for the final IR
                     # ir_delay_samples = compute_delay(ir_pyfar["ir_norm_hipass_window"].time[0])
                     # ir_delay_samples = compute_delay_adj(ir_pyfar["ir_norm_hipass_window"].time[0], ir_delay_samples)
-                    ir_delay_samples = compute_delay_offset(data=ir_pyfar["ir_norm_hipass_window"].time[0], idx=ir_delay_samples, sr=ir_samplerate, offset=0.0001)
+                    # crop_offset is this file own first arrival measured from the session
+                    # time origin, so every file of the session lands on the same origin and
+                    # min(Data.Delay) comes out equal in all of them. see the zero_delay block
+                    # in compute_sofa(): that equality is what keeps the receiver pairs aligned
+                    # when they are rendered separately and merged.
+                    ir_delay_samples = ir_delay_samples - crop_offset
 
                     ir_len = ir_pyfar["ir_norm_hipass_window"].n_samples
 
-                    if ir_len > ir_delay_samples:
+                    if (ir_delay_samples >= 0) and (ir_len > ir_delay_samples):
                         # window/all samples count
                         tmp = ir_len - ir_delay_samples
                         if tmp > samples_ir_window:
@@ -406,7 +592,14 @@ def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero
 
                         if(remove_direct_path>0):
                             # TODO: apply windowing to the crossing point
-                            ir_null_samples = ir_delay_samples + int(round(ir_samplerate*remove_direct_path))
+                            # measured from the onset, as before, not from the crop index
+                            ir_guarded_samples = compute_delay_offset(
+                                data=ir_pyfar["ir_norm_hipass_window"].time[0],
+                                idx=(ir_delay_samples + crop_offset),
+                                sr=ir_samplerate,
+                                offset=0.0001,
+                            )
+                            ir_null_samples = ir_guarded_samples + int(round(ir_samplerate*remove_direct_path))
                             if(ir_samples < ir_null_samples):
                                 ir_null_samples = ir_samples
                             # erase direct path wave
@@ -427,8 +620,8 @@ def read_ir_samples(data=None, data_delay=None, configs=None, folders=None, zero
                             data_delay[i, ii] = ir_delay_samples                            
                     else:
                         logger.error(
-                            "ERROR: invalide delay samples for:{} rx_id:{} [{}<{}] ".format(
-                                ir_pyfar_filename, ii, ir_len, ir_delay_samples
+                            "ERROR: invalid crop index for:{} rx_id:{} [crop {} outside 0..{}] ".format(
+                                ir_pyfar_filename, ii, ir_delay_samples, ir_len
                             )
                         )
                         err += 1
@@ -546,6 +739,9 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
     measure_folder_list = []
     measure_audio_config_list = []
     measures_list = list(measures_list)
+
+    # time origin this file is referenced to, see the zero_delay block below
+    onset_reference = 0
 
     # unpack list
     for m in measures_list:
@@ -867,12 +1063,145 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
             logger.error("compute sofa: {} IR delay entries could not be read, aborting.".format(err))
 
         #
+        # zero_delay time origin.
+        #
+        # 3DTune-In re-zeroes every SOFA it loads against the smallest Data.Delay in
+        # (HRTF.cpp, RemoveCommonDelay_HRTFDataBaseTable), so the arrival a
+        # renderer ends up with is always "onset - min(Data.Delay) of this file".
+        #
+        # the origin has to be one value for the whole session, and as LARGE as it can
+        # be: whatever is left in the HRIR after it is removed gets added on top of the
+        # propagation delay the renderer computes for the virtual source, so anything
+        # beyond the mic offset from the array centre is latency the recorded scene
+        # never had. the largest admissible value is the earliest onset of any receiver
+        # rendered alongside this one, because the arrival left behind can never go
+        # negative: Data.Delay is unsigned and the impulse has to sit inside the stored
+        # waveform. that is what scan_onset_minimum() looks for, less the crop guard so
+        # the rising edge survives exactly as it always did.
+        #
+        # the scan deliberately covers receivers this run does not write, which is why
+        # it walks the whole listener instead of receivers_list, and why --exclude
+        # exists: an array left in the config from an older session still reports an
+        # onset, and letting it win the minimum delays every rendered track for nothing.
+        #
+        crop_offset = 0
+        exclude_list = []
+
+        if (0 == err) and (yaml_params["zero_delay"] != False):
+            exclude_list = excluded_receivers(config=measure_config_ref, exclude_names=yaml_params["exclude"])
+
+            # the origin has to sit at or below every onset of the receivers we write,
+            # or their crop would run past the arrival. excluding one of them would do
+            # exactly that, so refuse instead of quietly clamping
+            clash = [rx for rx in receivers_list if rx in exclude_list]
+            if len(clash) > 0:
+                logger.error(
+                    "compute sofa: --exclude covers receiver(s) {} that this run writes".format(
+                        ", ".join(str(rx) for rx in clash)
+                    )
+                )
+                err += 1
+
+        if (0 == err) and (yaml_params["zero_delay"] != False):
+            (scan_minimum, scan_mean, scan_count, scan_err) = scan_onset_minimum(
+                configs=measure_audio_config_list,
+                folders=measure_folder_list,
+                exclude_list=exclude_list,
+            )
+
+            if (scan_err > 0) or (scan_minimum == None) or (scan_mean == None):
+                logger.error(
+                    "compute sofa: {} onset(s) unreadable while looking for the zero_delay "
+                    "origin, aborting.".format(scan_err)
+                )
+                err += 1
+            else:
+                onset_reference = scan_minimum - crop_guard_samples(int(sofa.Data_SamplingRate))
+                crop_offset = int(sofa.Data_Delay.min()) - onset_reference
+
+                logger.info(
+                    "compute sofa: zero_delay origin {} samples ({:.3f} ms), earliest of {} "
+                    "onsets{}".format(
+                        onset_reference,
+                        1000.0 * onset_reference / float(sofa.Data_SamplingRate),
+                        scan_count,
+                        ""
+                        if len(exclude_list) == 0
+                        else ", excluding rx " + ", ".join(str(rx) for rx in exclude_list),
+                    )
+                )
+                logger.info(
+                    "compute sofa: this file crops {} samples ahead of each onset, "
+                    "min(Data.Delay) will be {}".format(crop_offset, onset_reference)
+                )
+
+                #
+                # latency the render is left carrying, on top of the propagation delay
+                # the renderer computes for the virtual source.
+                #
+                # 3DTune-In renders as "distance to the listener origin over c" plus
+                # whatever delay the HRIR still holds, so the HRIR has to supply each
+                # receiver offset from that origin. that offset is SIGNED: a receiver on
+                # the source side of the array should arrive before the origin does. a
+                # SOFA cannot say that, Data.Delay is unsigned and the impulse has to sit
+                # inside the stored waveform, so the whole set is lifted until the most
+                # negative case reaches zero. what is left over is this.
+                #
+                # it comes out as the mean arrival minus the origin because, averaged
+                # over a full azimuth circle with elevations symmetric about zero, the
+                # receiver offset averages to zero and only the lift survives. that also
+                # makes it derivable from the file alone, as
+                # mean(AuralysPrjIROnsetDelay) * fs - min(Data.Delay), but it is written
+                # down so a reader does not have to know the trick, and computed over the
+                # same receivers as the origin so every file of the session carries the
+                # SAME number. trimming different amounts off different tracks would put
+                # back exactly the skew the shared origin removes.
+                #
+                #
+                render_latency = scan_mean - (onset_reference / float(sofa.Data_SamplingRate))
+                logger.info(
+                    "compute sofa: render latency {:.1f} us ({:.2f} samples), trim this from "
+                    "every rendered track to land on free field timing".format(
+                        render_latency * 1e6, render_latency * float(sofa.Data_SamplingRate)
+                    )
+                )
+
+                sofa.add_attribute("GLOBAL_AuralysPrjRenderLatency", "{:.9f}".format(render_latency))
+                sofa.add_attribute(
+                    "GLOBAL_AuralysPrjRenderLatencyDescription",
+                    "seconds of latency left in the render on top of the propagation delay "
+                    "the renderer applies for the virtual source, caused by a SOFA not being "
+                    "able to hold the negative half of a receiver offset from the array "
+                    "origin. trim it from the front of every rendered track to bring absolute "
+                    "arrivals onto free field timing. it is identical in every SOFA file of "
+                    "this session and must be applied equally to all of them: different values "
+                    "on different tracks would skew them against each other. what is left "
+                    "after trimming is the spread of the measured source arc radius over "
+                    "elevation, which no constant can remove.",
+                )
+
+                #
+                # record the origin. it stays derivable from the file, but only while
+                # AuralysPrjIROnsetDelay survives in it, and sibling_reference_check()
+                # needs it written down to be able to compare one file against another.
+                #
+                sofa.add_attribute("GLOBAL_AuralysPrjZeroDelayReference", str(onset_reference))
+                sofa.add_attribute(
+                    "GLOBAL_AuralysPrjZeroDelayReferenceDescription",
+                    "time origin of this file, in samples from the start of the raw impulse "
+                    "response. a renderer that removes the smallest Data.Delay of the file "
+                    "(3DTune-In does) reconstructs every arrival as its onset minus this "
+                    "value. all the SOFA files of a session that are rendered together have "
+                    "to carry the same number or their tracks will be skewed against each other.",
+                )
+
+        #
         # we always keep the measured time of arrival as a private param.
         #
         # this is NOT a duplicate of Data.Delay: AES69 expresses Data.Delay in
         # whole samples and it holds the index the IR was actually cropped at
-        # (arrival minus the compute_delay_offset guard), while this one is the
-        # sub-sample arrival in seconds as measured by compute_hrir.find_ir_onset.
+        # (arrival minus crop_offset), while this one is the sub-sample arrival
+        # in seconds as measured by compute_hrir.find_ir_onset.
         #
         # it used to be called IRPeakDelay, which described np.argmax of the IR.
         # compute_hrir now reports the onset, so the name would be misleading.
@@ -933,6 +1262,7 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
                         sofa.Data_IR,
                         sofa.Data_Delay,
                         float(yaml_params["remove_direct_path"]),
+                        crop_offset,
                     )
                 )
 
@@ -960,8 +1290,27 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
                 zero_delay=bool(yaml_params["zero_delay"]),
                 receivers_list=receivers_list,
                 samples_ir_window=samples_ir_window,
-                remove_direct_path=float(yaml_params["remove_direct_path"])
+                remove_direct_path=float(yaml_params["remove_direct_path"]),
+                crop_offset=crop_offset,
             )
+
+        if (0 == err) and (yaml_params["zero_delay"] != False):
+            # the invariant the separately rendered pairs depend on: every file of the
+            # session has to bottom out on the same Data.Delay, or they will not share
+            # a time origin once they are merged
+            data_delay_min = int(sofa.Data_Delay.min())
+            if onset_reference != data_delay_min:
+                logger.error(
+                    "compute sofa: min(Data.Delay) is {}, expected {}. this file would not "
+                    "stay time aligned with the other receiver pairs.".format(
+                        data_delay_min, onset_reference
+                    )
+                )
+                err += 1
+            else:
+                logger.info(
+                    "compute sofa: min(Data.Delay) is {}, the session time origin".format(onset_reference)
+                )
 
         if err:
             # a missing or unreadable measurement leaves an all-zero HRIR at that
@@ -978,14 +1327,28 @@ def compute_sofa(audio_recording=None, measures_list=None, yaml_params=None):
             sofa.inspect()
             sofa.verify()
 
+            fileappend = ""
+            if yaml_params["select_rx"] != None:
+                fileappend = yaml_params["select_rx"].replace(",", "_")
+
+            filepath = measure_folder_list[0].split(measure_config_ref["custom"]["audio_folder"])[0]
+            filename = measure_config_ref["custom"]["project_folder"] + "_" + fileappend + ".sofa"
+
+            #
+            # the files of a session are rendered separately and merged, so they only
+            # stay aligned if they were built on the same origin. each run works that
+            # out on its own, so check against what is already on disk before adding
+            # another file to the set.
+            #
+            if yaml_params["zero_delay"] != False:
+                err += sibling_reference_check(
+                    filepath=filepath,
+                    project=measure_config_ref["custom"]["project_folder"],
+                    filename=filename,
+                    reference=onset_reference,
+                )
+
             if 0 == err:
-                fileappend = ""
-                if yaml_params["select_rx"] != None:
-                    fileappend = yaml_params["select_rx"].replace(",", "_")
-
-                filepath = measure_folder_list[0].split(measure_config_ref["custom"]["audio_folder"])[0]
-                filename = measure_config_ref["custom"]["project_folder"] + "_" + fileappend + ".sofa"
-
                 try:
                     logger.info("compute sofa: file writing: {} ...".format(filename))
                     sof.write_sofa(os.path.join(filepath, filename), sofa)
@@ -1127,6 +1490,13 @@ if __name__ == "__main__":
             type=str,
             help="select receivers array",
         )
+        parser.add_argument(
+            "-x",
+            "--exclude",
+            type=str,
+            nargs="+",
+            help="receiver short_name(s) kept out of the zero_delay time reference",
+        )
 
     #
     # no config, use defaults
@@ -1183,6 +1553,15 @@ if __name__ == "__main__":
             type=str,
             default="array_six,middle",
             help="select receiver array (default: %(default)s)",
+        )
+        parser.add_argument(
+            "-x",
+            "--exclude",
+            type=str,
+            nargs="+",
+            default=None,
+            help="receiver short_name(s) kept out of the zero_delay time reference "
+            "(default: %(default)s, every receiver of the listener counts)",
         )
 
     parser.add_argument(
