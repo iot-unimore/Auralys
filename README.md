@@ -30,7 +30,7 @@ The work is split in two steps that never run together:
 1. **Capture**, driven by `auralysCaptureHRTF.py`: positions the speaker, rotates the table, plays and records the
    sweep, and leaves on disk one folder per direction with the recording and a complete description of the setup
    (`config.yaml`).
-2. **Processing**, done by the scripts under `hrtf/`: deconvolution, time of arrival detection, and SOFA
+2. **Processing**, done by the scripts under `hrtf/compute_hrir.py` and `hrft/compute_3dti_sofa.py`: deconvolution, time of arrival detection, and SOFA
    generation. This step reads only what the capture wrote and can be repeated at any time on any machine.
 
 ## Repository layout
