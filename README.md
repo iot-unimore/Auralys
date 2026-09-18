@@ -10,6 +10,8 @@ the device: any object with any number of microphones can be placed at the centr
 The whole system is designed to be rebuilt from this repository: 3D printed parts, off-the-shelf components,
 electronics, firmware and software are all here, and no proprietary hardware or software is required.
 
+![Auralys_carpi_2025](docs/pics/auralys_carpi_2025.jpg)
+
 ## What it does
 
 A measurement campaign presents a loudspeaker at every direction of a grid around the device under test, plays an
